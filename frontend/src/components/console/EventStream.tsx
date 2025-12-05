@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Clock, CheckCircle2, XCircle, Activity, Terminal, Zap, AlertCircle, ExternalLink } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, Activity, Terminal, Zap, AlertCircle, ExternalLink, User, Wallet } from 'lucide-react'
 import type { AnalysisSession } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useEffect, useRef } from 'react'
@@ -18,10 +18,17 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
   const history = [...sessions].reverse()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom when new events arrive
+  // Auto-scroll to bottom when new events arrive, but only if user is already near bottom
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      
+      // Always scroll to bottom on initial load (history.length > 0)
+      // Or if user is near bottom
+      if (isNearBottom || history.length === 1) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      }
     }
   }, [history.length])
 
@@ -56,11 +63,14 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
             const decision = trade || impact?.tradeDecision
 
             return (
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 key={session.id}
                 onClick={() => onSelect(session)}
+                onKeyDown={(e) => e.key === 'Enter' && onSelect(session)}
                 className={cn(
-                  "w-full text-left p-3 rounded border transition-all group relative overflow-hidden",
+                  "w-full text-left p-3 rounded border transition-all group relative overflow-hidden cursor-pointer",
                   selectedId === session.id 
                     ? "bg-accent/10 border-accent/40" 
                     : "bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10"
@@ -131,18 +141,54 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
                          </div>
                       )}
 
-                      {/* BscScan Link for Confirmed Trades */}
-                      {trade?.status === 'confirmed' && trade.txHash && (
-                         <div className="border-t border-green-500/10 pt-1 mt-1">
+                      {/* Links for Confirmed or Failed Trades */}
+                      {(trade?.status === 'confirmed' || trade?.status === 'failed') && (
+                         <div className={cn(
+                            "border-t pt-1 mt-1 flex items-center gap-3 flex-wrap",
+                            trade.status === 'failed' ? "border-red-500/10" : "border-green-500/10"
+                         )}>
+                            {/* Transaction Link (Confirmed Only) */}
+                            {trade.status === 'confirmed' && trade.txHash && (
+                               <a 
+                                  href={`https://bscscan.com/tx/${trade.txHash}`}
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-[9px] font-mono text-green-400/80 hover:text-green-400 hover:underline transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                               >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                  Tx
+                               </a>
+                            )}
+                            
+                            {/* Wallet Link */}
                             <a 
-                               href={`https://bscscan.com/tx/${trade.txHash}`}
+                               href="https://bscscan.com/address/0xa19f71eb995c1bcf336aa96803624fe92650154b#tokentxns"
                                target="_blank" 
                                rel="noopener noreferrer"
-                               className="flex items-center gap-1 text-[9px] font-mono text-green-400/80 hover:text-green-400 hover:underline transition-colors"
+                               className={cn(
+                                  "flex items-center gap-1 text-[9px] font-mono hover:underline transition-colors",
+                                  trade.status === 'failed' ? "text-red-400/80 hover:text-red-400" : "text-green-400/80 hover:text-green-400"
+                               )}
                                onClick={(e) => e.stopPropagation()}
                             >
-                               <ExternalLink className="w-2.5 h-2.5" />
-                               View on BscScan
+                               <Wallet className="w-2.5 h-2.5" />
+                               Wallet
+                            </a>
+
+                            {/* Profile Link */}
+                            <a 
+                               href="https://app.opinion.trade/profile"
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className={cn(
+                                  "flex items-center gap-1 text-[9px] font-mono hover:underline transition-colors",
+                                  trade.status === 'failed' ? "text-red-400/80 hover:text-red-400" : "text-green-400/80 hover:text-green-400"
+                               )}
+                               onClick={(e) => e.stopPropagation()}
+                            >
+                               <User className="w-2.5 h-2.5" />
+                               Profile
                             </a>
                          </div>
                       )}
@@ -169,7 +215,7 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
                      </div>
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })
         )}

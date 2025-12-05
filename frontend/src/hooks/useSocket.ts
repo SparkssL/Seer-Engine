@@ -79,10 +79,7 @@ export function useSocket(): UseSocketReturn {
 
     // Handle session complete
     socket.on('session:complete', (session: AnalysisSession) => {
-      setActiveSession(prev => {
-        if (prev?.id === session.id) return null
-        return prev
-      })
+      setActiveSession(session)
       setSessions(prev => prev.map(s => s.id === session.id ? session : s))
     })
 

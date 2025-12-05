@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Terminal, Activity, Brain, Zap, Shield, 
   Search, CheckCircle2, AlertCircle, Lock, 
-  ArrowRight, TrendingUp, TrendingDown, Minus
+  ArrowRight, TrendingUp, TrendingDown, Minus, ExternalLink, Wallet, User
 } from 'lucide-react'
 import type { AnalysisSession, MarketImpact } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -419,11 +419,36 @@ export function CentralLens({ session }: CentralLensProps) {
                              {trade.txHash && (
                                 <div className="mt-3 pt-3 border-t border-white/5">
                                    <div className="text-[9px] font-mono text-cloud uppercase mb-1">Transaction Hash</div>
-                                   <div className="text-xs font-mono text-accent/80 break-all">
-                                      {trade.txHash}
-                                   </div>
+                                   <a 
+                                      href={`https://bscscan.com/tx/${trade.txHash}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-mono text-accent/80 break-all hover:text-accent hover:underline flex items-center gap-1"
+                                   >
+                                      {trade.txHash} <ExternalLink className="w-3 h-3" />
+                                   </a>
                                 </div>
                              )}
+
+                             {/* Action Links */}
+                             <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-end gap-2 flex-wrap">
+                                <a 
+                                   href="https://bscscan.com/address/0xa19f71eb995c1bcf336aa96803624fe92650154b#tokentxns"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-[10px] font-mono text-cloud hover:bg-white/10 hover:text-sand transition-colors flex items-center gap-1.5"
+                                >
+                                   <Wallet className="w-3 h-3" /> Wallet
+                                </a>
+                                <a 
+                                   href="https://app.opinion.trade/profile"
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   className="px-3 py-1.5 rounded bg-accent/10 border border-accent/20 text-[10px] font-mono text-accent hover:bg-accent/20 transition-colors flex items-center gap-1.5"
+                                >
+                                   <Zap className="w-3 h-3" /> Opinion Profile
+                                </a>
+                             </div>
 
                              {/* Failed Order Message */}
                              {trade.status === 'failed' && (
