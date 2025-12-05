@@ -2,12 +2,12 @@
 
 import { motion } from 'framer-motion'
 import { Settings, Play, Pause, Power, Activity, Shield, Wallet } from 'lucide-react'
-import type { Source, Tweet, Market, AnalysisSession, SessionAnalytics } from '@/lib/types'
+import type { Source, Tweet, Market, AnalysisSession, SessionAnalytics, ConnectionStatus } from '@/lib/types'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { CentralLens } from './CentralLens'
 import { EventStream } from './EventStream'
-import { MarketImpactPanel } from '@/components/MarketImpactPanel' // Reuse existing panel logic but restyle later?
+import { MarketImpactPanel } from '@/components/MarketImpactPanel'
 
 interface OracleConsoleProps {
   sources: Source[]
@@ -16,6 +16,7 @@ interface OracleConsoleProps {
   activeSession: AnalysisSession | null
   sessions: AnalysisSession[]
   analytics: SessionAnalytics | null
+  status: ConnectionStatus
   onDisconnect: () => void
 }
 
@@ -25,10 +26,16 @@ export function OracleConsole({
   activeSession,
   sessions,
   analytics,
+  status,
   onDisconnect
 }: OracleConsoleProps) {
   const [isPaused, setIsPaused] = useState(false)
-  const [historySelection, setHistorySelection] = useState<AnalysisSession | null>(null)
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
+
+  // Look up selected session from sessions array so it updates in real-time
+  const historySelection = selectedHistoryId
+    ? sessions.find(s => s.id === selectedHistoryId) || null
+    : null
 
   // View Logic: Show history selection if active, otherwise show live session
   const displaySession = historySelection || activeSession
@@ -57,7 +64,7 @@ export function OracleConsole({
               <div className="flex items-center gap-2 text-cloud">
                  <Wallet className="w-3 h-3" />
                  <span>BALANCE:</span>
-                 <span className="text-sand">$12,450.00 USDC</span>
+                 <span className="text-sand">$1.09 USDT</span>
               </div>
            </div>
         </div>
@@ -85,10 +92,19 @@ export function OracleConsole({
         </div>
       </header>
 
-      {/* 2. Main Workspace (Split View) */}
+      {/* 2. Main Workspace (3-Column Layout) */}
       <div className="flex-1 flex overflow-hidden relative">
          
-         {/* Left: The Lens (Main Visualization) */}
+         {/* Left Sidebar: Ingestion Stream (Chat Style) */}
+         <div className="flex-shrink-0 z-30 h-full border-r border-white/5 bg-surface/60 backdrop-blur-md">
+            <EventStream
+               sessions={sessions}
+               selectedId={displaySession?.id}
+               onSelect={(session) => setSelectedHistoryId(session.id)}
+            />
+         </div>
+
+         {/* Center: The Lens (Main Visualization) */}
          <div className="flex-1 flex flex-col relative z-10">
             {/* The Stage */}
             <div className="flex-1 relative overflow-hidden">
@@ -101,8 +117,8 @@ export function OracleConsole({
                   <div className="absolute top-4 right-4 px-3 py-1 bg-accent/20 border border-accent/40 rounded-full text-[10px] font-mono text-accent flex items-center gap-2">
                      <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                      VIEWING HISTORY
-                     <button 
-                        onClick={() => setHistorySelection(null)}
+                     <button
+                        onClick={() => setSelectedHistoryId(null)}
                         className="ml-2 hover:text-white"
                      >
                         ×
@@ -110,19 +126,10 @@ export function OracleConsole({
                   </div>
                )}
             </div>
-
-            {/* The Stream (Bottom Timeline) */}
-            <div className="h-40 flex-shrink-0 z-20">
-               <EventStream 
-                  sessions={sessions} 
-                  selectedId={displaySession?.id} 
-                  onSelect={setHistorySelection}
-               />
-            </div>
          </div>
 
          {/* Right: Context Sidebar */}
-         <div className="w-96 border-l border-white/5 bg-surface/60 backdrop-blur-md flex flex-col z-20">
+         <div className="w-80 border-l border-white/5 bg-surface/60 backdrop-blur-md flex flex-col z-20">
             <div className="flex-1 overflow-y-auto p-6">
                <h3 className="font-display text-xs text-sand tracking-widest uppercase mb-6 flex items-center gap-2">
                   <Activity className="w-3 h-3 text-accent" />
@@ -131,24 +138,38 @@ export function OracleConsole({
                
                {/* Market Cards Mini */}
                <div className="space-y-3">
-                  {markets.map(market => (
-                     <div 
-                        key={market.id}
-                        className="p-3 rounded border border-white/5 bg-black/20 hover:border-white/10 transition-colors cursor-pointer"
-                     >
-                        <div className="text-xs text-sand font-medium leading-snug mb-2">
-                           {market.question}
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-mono text-cloud">
-                           <span>VOL: ${(market.volume / 1000).toFixed(1)}k</span>
-                           <span className={cn(
-                              market.status === 'active' ? "text-green-400" : "text-cloud"
-                           )}>
-                              {market.status.toUpperCase()}
-                           </span>
-                        </div>
-                     </div>
-                  ))}
+                  {(status === 'connecting' || (status === 'connected' && markets.length === 0)) ? (
+                    <div className="flex flex-col gap-3">
+                      {[1, 2, 3, 4].map(i => (
+                         <div key={i} className="p-3 rounded border border-white/5 bg-black/20 animate-pulse">
+                            <div className="h-4 w-3/4 bg-white/10 rounded mb-3" />
+                            <div className="flex items-center justify-between">
+                               <div className="h-3 w-1/4 bg-white/10 rounded" />
+                               <div className="h-3 w-1/6 bg-white/10 rounded" />
+                            </div>
+                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    markets.map(market => (
+                       <div 
+                          key={market.id}
+                          className="p-3 rounded border border-white/5 bg-black/20 hover:border-white/10 transition-colors cursor-pointer"
+                       >
+                          <div className="text-xs text-sand font-medium leading-snug mb-2">
+                             {market.question}
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-cloud">
+                             <span>VOL: ${(market.volume / 1000).toFixed(1)}k</span>
+                             <span className={cn(
+                                market.status === 'active' ? "text-green-400" : "text-cloud"
+                             )}>
+                                {market.status.toUpperCase()}
+                             </span>
+                          </div>
+                       </div>
+                    ))
+                  )}
                </div>
             </div>
          </div>
@@ -156,5 +177,3 @@ export function OracleConsole({
     </div>
   )
 }
-
-

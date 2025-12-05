@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Seer Engine is an AI-powered real-time prediction market trading bot built for BNB Chain. It monitors Twitter events via WebSocket, analyzes their market impact using GPT-4, and automatically executes trades on [Opinion Trade](https://opinion.trade) prediction markets.
+Seer Engine is an AI-powered real-time prediction market trading bot built for BNB Chain. It monitors Twitter events via WebSocket, analyzes their market impact using GPT-5, and automatically executes trades on [Opinion Trade](https://opinion.trade) prediction markets.
 
 **Key Technologies:**
 - Frontend: Next.js 14, React 18, Tailwind CSS, Socket.IO client
 - Backend: Node.js/Express with TypeScript, Socket.IO server
-- AI Analysis: OpenAI GPT-4 Turbo
+- AI Analysis: OpenAI GPT-5 Turbo
 - Trading: Python with Opinion CLOB SDK
 - Real-time: WebSocket connections for Twitter streams and client updates
 
@@ -92,7 +92,7 @@ python main.py
                                  │
                                  ▼
                         ┌──────────────────┐
-                        │   OpenAI GPT-4   │
+                        │   OpenAI GPT-5   │
                         │   (Analysis)     │
                         └──────────────────┘
                                  │
@@ -106,8 +106,8 @@ python main.py
 ### Data Flow
 
 1. **Event Capture**: Twitter WebSocket streams tweets from configured accounts to backend
-2. **Market Filtering (Stage A)**: GPT-4 quickly scans all markets to find 3-5 relevant ones (cheap, fast)
-3. **Impact Analysis (Stage B)**: GPT-4 deeply analyzes each filtered market and generates trade decisions (expensive, detailed)
+2. **Market Filtering (Stage A)**: GPT-5 quickly scans all markets to find 3-5 relevant ones (cheap, fast)
+3. **Impact Analysis (Stage B)**: GPT-5 deeply analyzes each filtered market and generates trade decisions (expensive, detailed)
 4. **Trade Execution**: Python service places orders via Opinion CLOB SDK on BNB Chain
 5. **Real-time Updates**: All steps stream to frontend via Socket.IO for live visualization
 
@@ -154,7 +154,7 @@ The backend (`backend/src/`) orchestrates the entire analysis pipeline:
 **Type System** (`types.ts`):
 - Shared TypeScript interfaces between frontend/backend
 - Critical types: `AnalysisSession`, `MarketImpact`, `TradeExecution`
-- LLM response schemas: `GPTMarketFilterResponse`, `GPTMarketAnalysisResponse`
+- LLM response schemas: `GPTMarketFilterResponse`, `GPTMarketAnalysisResponse`, `GPTMarketSelectionResponse`
 
 ### Frontend Architecture
 
@@ -179,6 +179,27 @@ The frontend (`frontend/src/`) is a Next.js 14 app with client-side Socket.IO co
 - `session:start`: Analysis session started
 - `session:update`: Step progress or data updated
 - `session:complete`: Analysis finished
+
+### Three-Stage LLM Pipeline (Updated 2025-12-06)
+
+The system now uses a **three-stage LLM pipeline** for intelligent decision-making:
+
+1. **Stage A (Filtering)**: Fast scan to find 3-5 relevant markets from hundreds
+   - Model: GPT-5 Turbo
+   - Temperature: 0.2
+   - Cost: Low (compact market summaries)
+
+2. **Stage B (Analysis)**: Deep analysis with trading decision for each filtered market
+   - Model: GPT-5 Turbo
+   - Temperature: 0.3
+   - Cost: Medium (full market details)
+
+3. **Stage C (Selection)**: **LLM intelligently selects the ONE best market to trade**
+   - Model: GPT-5 Turbo
+   - Temperature: 0.4
+   - Cost: Low (single comparison call)
+   - **Considers**: Impact score, confidence, edge quality, liquidity, time sensitivity, risk/reward
+   - **Returns**: Selected market ID, reasoning, comparative analysis, selection confidence
 
 ### Python Trading Service
 
@@ -216,7 +237,7 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 ### Environment Variables (`.env`)
 
 **Required**:
-- `OPENAI_API_KEY`: OpenAI API key for GPT-4 analysis
+- `OPENAI_API_KEY`: OpenAI API key for GPT-5 analysis
 
 **Required for Production**:
 - `TWITTER_API_KEY`: twitterapi.io API key for real-time tweets (no mock data fallback)
@@ -241,19 +262,23 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 
 If credentials are missing or invalid, the system will return errors instead of mock data.
 
-### Trading Parameters
+### Trading Parameters (Updated 2025-12-06)
 
 Configured in `backend/src/services/analyzer.ts`:
+- **Trading Strategy**: ONE trade per event on the SINGLE best market (LLM-selected)
+- **Fixed trade amount**: $5 per trade (constant)
 - Minimum impact threshold: `impactScore > 0.6`
-- **Minimum confidence threshold**: `confidence > 0.7` (Updated 2025-12-06)
+- **Minimum confidence threshold**: `confidence > 0.7`
 - Trade action filter: `action !== 'HOLD' && side !== null`
-- Balance guard: Fetches wallet balance once per session, caps trade sizes to available funds
+- Balance guard: Checks wallet balance before trade, requires minimum $5 available
+- **Selection logic**: **LLM intelligently selects best market** (no hard-coded rules)
 
 Configured in `backend/src/services/openai.ts`:
 - Max markets to analyze: 5 (even if more are filtered)
-- Temperature: 0.2 (filtering), 0.3 (analysis)
-- Max tokens: 500 (filtering), 600 (analysis)
-- **AI generates confidence scores** (0.0-1.0) for each analysis (Updated 2025-12-06)
+- Temperature: 0.2 (filtering), 0.3 (analysis), **0.4 (selection)**
+- Max tokens: 500 (filtering), 600 (analysis), **400 (selection)**
+- **AI generates confidence scores** (0.0-1.0) for each analysis
+- **AI makes final trading decision**: Selects ONE market using holistic evaluation
 
 ### Twitter Sources
 
@@ -288,12 +313,16 @@ Backend emits events prefixed by domain:
 
 Frontend listens for these events and updates React state via `useSocket` hook.
 
-### LLM Prompt Engineering
+### LLM Prompt Engineering (Updated 2025-12-06)
 
-The two-stage pipeline is cost-optimized:
+The **three-stage pipeline** is cost-optimized and decision-driven:
 - **Stage A (Filter)**: Uses compact market summaries (id, question, category only)
 - **Stage B (Analysis)**: Includes full market details (prices, volume, end date)
-- Both stages use `response_format: { type: 'json_object' }` for structured output
+- **Stage C (Selection)**: **NEW** - LLM makes final decision on which market to trade
+  - Receives all analyzed market impacts with scores and reasoning
+  - Considers: impact score, confidence, edge quality, liquidity, time sensitivity, risk/reward
+  - Returns selection with comparative analysis and reasoning
+- All stages use `response_format: { type: 'json_object' }` for structured output
 - Prompts include explicit rules for trade sizing and confidence thresholds
 
 ### Session History (Updated 2025-12-06)

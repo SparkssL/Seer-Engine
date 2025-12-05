@@ -61,6 +61,7 @@ export interface MarketImpact {
   impactScore: number
   confidence: number
   reasoning: string
+  reasoningSteps?: string[]  // Step-by-step LLM reasoning
   tradeDecision: {
     action: 'BUY' | 'SELL' | 'HOLD'
     side: 'YES' | 'NO' | null
@@ -76,6 +77,7 @@ export interface TradeExecution {
   amount: number
   price: number
   status: 'pending' | 'confirmed' | 'failed'
+  error?: string
   txHash?: string
   timestamp: string
 }

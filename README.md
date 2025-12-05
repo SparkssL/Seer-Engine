@@ -2,7 +2,7 @@
 
 > AI-Powered Real-Time Prediction Market Trading Bot
 
-A BNB Chain hackathon project by the Midaz team. Seer Engine monitors real-time Twitter events, analyzes their market impact using GPT-4, and automatically executes trades on [Opinion Trade](https://opinion.trade) prediction markets.
+A BNB Chain hackathon project by the Midaz team. Seer Engine monitors real-time Twitter events, analyzes their market impact using GPT-5, and automatically executes trades on [Opinion Trade](https://opinion.trade) prediction markets.
 
 ![Seer Engine Banner](https://via.placeholder.com/1200x400/0a0a0f/00fff7?text=SEER+ENGINE)
 
@@ -142,7 +142,7 @@ Choose which Twitter accounts to monitor:
 
 ### Live Dashboard
 - **Tweet Feed** - Real-time incoming events
-- **AI Analysis Pipeline** - Watch GPT-4 analyze events step-by-step
+- **AI Analysis Pipeline** - Watch GPT-5 analyze events step-by-step
 - **Market Impact** - See which markets are affected and why
 - **Trade Execution** - Track automated trades
 
@@ -162,7 +162,7 @@ Adjust in `backend/src/services/analyzer.ts`:
 ### Twitter API
 Using [twitterapi.io](https://twitterapi.io) WebSocket for real-time tweet streaming.
 
-### OpenAI GPT-4
+### OpenAI GPT-5
 Used for:
 1. Filtering relevant markets from event context
 2. Analyzing impact direction (positive/negative)
@@ -178,7 +178,7 @@ Used for:
 | Frontend | Next.js 14, React 18, Tailwind CSS, Framer Motion |
 | Backend | Node.js, Express, Socket.IO, TypeScript |
 | Trading | Python, Opinion CLOB SDK, Web3.py |
-| AI | OpenAI GPT-4 Turbo |
+| AI | OpenAI GPT-5 Turbo |
 | Blockchain | BNB Chain |
 
 ## 📁 Project Structure

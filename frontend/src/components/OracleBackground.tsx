@@ -7,11 +7,11 @@ import * as THREE from 'three'
 
 function ParticleField() {
   const ref = useRef<THREE.Points>(null)
+  const particleCount = 4000
   
   const positions = useMemo(() => {
-    const count = 2000
-    const positions = new Float32Array(count * 3)
-    for (let i = 0; i < count; i++) {
+    const positions = new Float32Array(particleCount * 3)
+    for (let i = 0; i < particleCount; i++) {
       const r = 20 + Math.random() * 30 // Radius
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
@@ -21,7 +21,7 @@ function ParticleField() {
       positions[i * 3 + 2] = r * Math.cos(phi)
     }
     return positions
-  }, [])
+  }, [particleCount])
 
   useFrame((state) => {
     if (ref.current) {
@@ -31,14 +31,14 @@ function ParticleField() {
   })
 
   return (
-    <Points ref={ref} positions={positions} stride={3} frustumCulled={false}>
+    <Points key={particleCount} ref={ref} positions={positions} stride={3} frustumCulled={false}>
       <PointMaterial
         transparent
         color="#f2c35c"
-        size={0.15}
+        size={0.2}
         sizeAttenuation={true}
         depthWrite={false}
-        opacity={0.6}
+        opacity={0.8}
         blending={THREE.AdditiveBlending}
       />
     </Points>
@@ -62,7 +62,7 @@ function InnerSphere() {
         color="#7fd8ff" 
         wireframe 
         transparent 
-        opacity={0.05} 
+        opacity={0.15} 
       />
     </mesh>
   )
@@ -77,9 +77,10 @@ export function OracleBackground() {
         <ParticleField />
         <InnerSphere />
       </Canvas>
-      <div className="absolute inset-0 bg-gradient-to-b from-canvas via-transparent to-canvas opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-canvas via-transparent to-canvas opacity-40" />
     </div>
   )
 }
+
 
 

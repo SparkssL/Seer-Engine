@@ -106,7 +106,12 @@ export function Dashboard({
           <div className="xl:col-span-3 flex flex-col gap-6 h-full overflow-hidden">
              {/* Tweet Feed */}
              <div className="flex-1 min-h-0">
-                <TweetFeed tweets={tweets} activeTweetId={activeTweetId} />
+                <TweetFeed
+                  tweets={tweets}
+                  activeTweetId={activeTweetId}
+                  activeSession={activeSession}
+                  sessions={sessions}
+                />
              </div>
              
              {/* Session History (Mini List) */}

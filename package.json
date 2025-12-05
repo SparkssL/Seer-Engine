@@ -4,15 +4,13 @@
   "description": "AI-powered prediction market trading bot with real-time Twitter event analysis",
   "private": true,
   "workspaces": [
-    "frontend",
-    "backend"
+    "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:trader\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:trader": "cd python-trader && python main.py",
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../python-trader && pip install -r requirements.txt",
+    "dev:backend": "cd backend && python3 -m uvicorn main:socket_app --host 0.0.0.0 --port 3001 --reload",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
     "build": "cd frontend && npm run build"
   },
   "devDependencies": {

@@ -208,24 +208,120 @@ export function CentralLens({ session }: CentralLensProps) {
                     <div className="space-y-4">
                        {session.marketImpacts.map(impact => (
                           <div key={impact.marketId} className="bg-black/20 rounded-lg p-4 border border-white/5">
+                             {/* Market Header */}
                              <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-sand font-medium text-sm">{impact.market.question}</h4>
-                                <div className="flex items-center gap-2">
-                                   <span className="text-[10px] font-mono text-cloud">CONFIDENCE</span>
-                                   <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden">
-                                      <div 
-                                         className="h-full bg-accent" 
-                                         style={{ width: `${impact.impactScore * 100}%` }} 
-                                      />
+                                <h4 className="text-sand font-medium text-sm flex-1">{impact.market.question}</h4>
+                                <span className={cn(
+                                   "px-2 py-0.5 rounded text-[10px] font-mono uppercase",
+                                   impact.sentiment === 'POSITIVE' ? "bg-green-500/20 text-green-400" :
+                                   impact.sentiment === 'NEGATIVE' ? "bg-red-500/20 text-red-400" :
+                                   "bg-gray-500/20 text-gray-400"
+                                )}>
+                                   {impact.sentiment}
+                                </span>
+                             </div>
+
+                             {/* Market Details Grid */}
+                             <div className="grid grid-cols-4 gap-2 mb-4 p-2 rounded bg-black/30 border border-white/5">
+                                <div className="text-center">
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Category</div>
+                                   <div className="text-xs text-sand font-medium">{impact.market.category}</div>
+                                </div>
+                                <div className="text-center">
+                                   <div className="text-[9px] font-mono text-cloud uppercase">YES Price</div>
+                                   <div className="text-xs text-green-400 font-mono">
+                                      {((impact.market.outcomes?.[0]?.probability || 0.5) * 100).toFixed(1)}%
+                                   </div>
+                                </div>
+                                <div className="text-center">
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Volume</div>
+                                   <div className="text-xs text-sand font-mono">${(impact.market.volume / 1000).toFixed(1)}k</div>
+                                </div>
+                                <div className="text-center">
+                                   <div className="text-[9px] font-mono text-cloud uppercase">End Date</div>
+                                   <div className="text-xs text-sand font-mono">
+                                      {impact.market.endDate ? new Date(impact.market.endDate).toLocaleDateString() : 'N/A'}
                                    </div>
                                 </div>
                              </div>
-                             
+
+                             {/* LLM Analysis Scores */}
+                             <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="flex items-center gap-2">
+                                   <span className="text-[10px] font-mono text-cloud uppercase w-16">Impact</span>
+                                   <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                      <div
+                                         className="h-full bg-accent transition-all"
+                                         style={{ width: `${impact.impactScore * 100}%` }}
+                                      />
+                                   </div>
+                                   <span className="text-xs font-mono text-accent">{(impact.impactScore * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                   <span className="text-[10px] font-mono text-cloud uppercase w-16">Confidence</span>
+                                   <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                      <div
+                                         className="h-full bg-blue-400 transition-all"
+                                         style={{ width: `${impact.confidence * 100}%` }}
+                                      />
+                                   </div>
+                                   <span className="text-xs font-mono text-blue-400">{(impact.confidence * 100).toFixed(0)}%</span>
+                                </div>
+                             </div>
+
+                             {/* LLM Reasoning Steps */}
+                             {impact.reasoningSteps && impact.reasoningSteps.length > 0 && (
+                                <div className="mb-4 bg-black/30 rounded-lg p-3 border border-white/5">
+                                   <div className="text-[10px] font-mono text-accent uppercase tracking-wider mb-2">
+                                      LLM Reasoning Chain
+                                   </div>
+                                   <div className="space-y-2">
+                                      {impact.reasoningSteps.map((step, idx) => (
+                                         <div key={idx} className="flex gap-2">
+                                            <span className="text-accent font-mono text-xs shrink-0">{idx + 1}.</span>
+                                            <p className="text-xs text-cloud/90 leading-relaxed">{step}</p>
+                                         </div>
+                                      ))}
+                                   </div>
+                                </div>
+                             )}
+
+                             {/* LLM Final Reasoning Summary */}
                              <p className="text-xs text-cloud mb-4 border-l-2 border-accent/30 pl-3 italic">
                                 {impact.reasoning}
                              </p>
 
-                             {/* Trade Seal */}
+                             {/* LLM Trade Decision */}
+                             <div className="bg-black/40 rounded-lg p-3 border border-white/10">
+                                <div className="text-[10px] font-mono text-accent uppercase tracking-wider mb-2">
+                                   LLM Trade Decision
+                                </div>
+                                <div className="flex items-center justify-between">
+                                   <div className="flex items-center gap-4">
+                                      <div className={cn(
+                                         "px-3 py-1 rounded font-mono text-sm font-bold",
+                                         impact.tradeDecision.action === 'BUY' ? "bg-green-500/20 text-green-400" :
+                                         impact.tradeDecision.action === 'SELL' ? "bg-red-500/20 text-red-400" :
+                                         "bg-gray-500/20 text-gray-400"
+                                      )}>
+                                         {impact.tradeDecision.action}
+                                      </div>
+                                      {impact.tradeDecision.side && (
+                                         <div className="text-sand font-mono">
+                                            Side: <span className="text-accent">{impact.tradeDecision.side}</span>
+                                         </div>
+                                      )}
+                                   </div>
+                                   <div className="text-right">
+                                      <div className="text-[10px] text-cloud">Suggested Price</div>
+                                      <div className="text-lg font-mono text-accent">
+                                         {(impact.tradeDecision.suggestedPrice * 100).toFixed(1)}¢
+                                      </div>
+                                   </div>
+                                </div>
+                             </div>
+
+                             {/* Trade Seal for visual effect */}
                              {impact.tradeDecision.action !== 'HOLD' && (
                                 <div className="flex justify-center mt-6">
                                    <TradeSeal impact={impact} />
@@ -246,16 +342,103 @@ export function CentralLens({ session }: CentralLensProps) {
 
         {/* 4. Execution Receipt */}
         {hasTrade && (
-           <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-center pt-8 pb-12"
-           >
-              <div className="flex items-center gap-2 text-green-400 font-mono text-xs uppercase tracking-widest">
-                 <Zap className="w-4 h-4" />
-                 Transaction Confirmed On-Chain
+           <>
+              <div className="flex justify-center">
+                 <ArrowRight className="w-5 h-5 text-white/10 rotate-90" />
               </div>
-           </motion.div>
+
+              <ThoughtBlock
+                 title="Order Execution"
+                 icon={Zap}
+                 status="complete"
+              >
+                 <div className="space-y-3">
+                    {session.trades.map(trade => {
+                       const relatedMarket = session.marketImpacts.find(i => i.marketId === trade.marketId)?.market
+                       return (
+                          <div key={trade.id} className="bg-black/30 rounded-lg p-4 border border-white/10">
+                             {/* Order Status Header */}
+                             <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                   <span className={cn(
+                                      "w-2 h-2 rounded-full",
+                                      trade.status === 'confirmed' ? "bg-green-400" :
+                                      trade.status === 'failed' ? "bg-red-400" :
+                                      "bg-yellow-400 animate-pulse"
+                                   )} />
+                                   <span className={cn(
+                                      "text-xs font-mono uppercase",
+                                      trade.status === 'confirmed' ? "text-green-400" :
+                                      trade.status === 'failed' ? "text-red-400" :
+                                      "text-yellow-400"
+                                   )}>
+                                      {trade.status === 'confirmed' ? 'ORDER FILLED' :
+                                       trade.status === 'failed' ? 'ORDER FAILED' :
+                                       'PENDING...'}
+                                   </span>
+                                </div>
+                                <span className="text-[10px] font-mono text-cloud">
+                                   {new Date(trade.timestamp).toLocaleTimeString()}
+                                </span>
+                             </div>
+
+                             {/* Market Info */}
+                             {relatedMarket && (
+                                <div className="mb-3 pb-3 border-b border-white/5">
+                                   <div className="text-[10px] font-mono text-cloud uppercase mb-1">Market</div>
+                                   <div className="text-sm text-sand">{relatedMarket.question}</div>
+                                </div>
+                             )}
+
+                             {/* Order Details Grid */}
+                             <div className="grid grid-cols-4 gap-3">
+                                <div>
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Side</div>
+                                   <div className={cn(
+                                      "text-sm font-mono font-bold",
+                                      trade.side === 'YES' || trade.side === 'UP' ? "text-green-400" : "text-red-400"
+                                   )}>
+                                      {trade.side}
+                                   </div>
+                                </div>
+                                <div>
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Amount</div>
+                                   <div className="text-sm font-mono text-sand">${trade.amount.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Price</div>
+                                   <div className="text-sm font-mono text-accent">{(trade.price * 100).toFixed(1)}¢</div>
+                                </div>
+                                <div>
+                                   <div className="text-[9px] font-mono text-cloud uppercase">Market ID</div>
+                                   <div className="text-sm font-mono text-cloud">#{trade.marketId}</div>
+                                </div>
+                             </div>
+
+                             {/* TX Hash */}
+                             {trade.txHash && (
+                                <div className="mt-3 pt-3 border-t border-white/5">
+                                   <div className="text-[9px] font-mono text-cloud uppercase mb-1">Transaction Hash</div>
+                                   <div className="text-xs font-mono text-accent/80 break-all">
+                                      {trade.txHash}
+                                   </div>
+                                </div>
+                             )}
+
+                             {/* Failed Order Message */}
+                             {trade.status === 'failed' && (
+                                <div className="mt-3 p-2 rounded bg-red-500/10 border border-red-500/20">
+                                   <div className="text-xs text-red-400">
+                                      {trade.error || "Order execution failed. Check wallet balance or API configuration."}
+                                   </div>
+                                </div>
+                             )}
+                          </div>
+                       )
+                    })}
+                 </div>
+              </ThoughtBlock>
+           </>
         )}
       </div>
     </div>

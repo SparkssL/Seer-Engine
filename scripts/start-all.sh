@@ -22,8 +22,9 @@ if [[ ! -d "$ROOT/backend/node_modules" ]]; then (cd backend && npm install); fi
 if [[ "${DEMO_MODE}" == "true" ]]; then
   echo "🛑 DEMO_MODE=true -> skipping python-trader deps"
 else
-  echo "🐍 Ensuring python-trader deps..."
-  (cd python-trader && python -m pip install -r requirements.txt)
+echo "🐍 Ensuring python-trader deps..."
+PYTHON_BIN="${PYTHON_BIN:-/opt/homebrew/opt/python@3.10/bin/python3.10}"
+(cd python-trader && "$PYTHON_BIN" -m pip install -r requirements.txt)
 fi
 
 echo "🚀 Starting services (DEMO_MODE=${DEMO_MODE})..."
@@ -31,6 +32,6 @@ if [[ "${DEMO_MODE}" == "true" ]]; then
   # In demo we skip trader; backend uses mock Opinion
   npx concurrently "npm run dev:backend" "npm run dev:frontend"
 else
-  npm run dev
+  PYTHON_BIN="$PYTHON_BIN" npm run dev
 fi
 
