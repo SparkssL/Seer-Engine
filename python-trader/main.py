@@ -26,7 +26,7 @@ except ImportError:
     SDK_AVAILABLE = False
     InvalidParamError = Exception
     OpenApiError = Exception
-    print(json.dumps({"type": "warning", "message": "Opinion CLOB SDK not installed, running in mock mode"}))
+    print(json.dumps({"type": "error", "message": "Opinion CLOB SDK not installed. Install with: pip install opinion-clob-sdk"}), flush=True)
 
 
 class OpinionTrader:
@@ -38,19 +38,27 @@ class OpinionTrader:
     def connect(self) -> bool:
         """Connect to Opinion Trade API with cache configuration"""
         if not SDK_AVAILABLE:
-            print(json.dumps({"type": "info", "message": "Running in mock mode - SDK not available"}))
-            return True
+            print(json.dumps({"type": "error", "message": "Opinion CLOB SDK not installed. Install with: pip install opinion-clob-sdk"}))
+            return False
 
         try:
             api_key = os.getenv('OPINION_API_KEY')
             private_key = os.getenv('OPINION_PRIVATE_KEY')
             rpc_url = os.getenv('OPINION_RPC_URL', 'https://bsc-dataseed.binance.org')
-            multi_sig_addr = os.getenv('OPINION_MULTISIG_ADDR', '')
+            multi_sig_addr = os.getenv('OPINION_MULTISIG_ADDR')
 
-            if not api_key or not private_key:
-                print(json.dumps({"type": "warning", "message": "Missing API credentials, running in mock mode"}))
-                return True
+            # Validate required credentials per SDK docs
+            if not api_key:
+                print(json.dumps({"type": "error", "message": "Missing OPINION_API_KEY in .env file"}), flush=True)
+                return False
+            if not private_key:
+                print(json.dumps({"type": "error", "message": "Missing OPINION_PRIVATE_KEY in .env file"}), flush=True)
+                return False
+            if not multi_sig_addr:
+                print(json.dumps({"type": "error", "message": "Missing OPINION_MULTISIG_ADDR in .env file (required for holding assets/portfolio)"}), flush=True)
+                return False
 
+            # Initialize client with proper cache configuration per SDK docs
             self.client = Client(
                 host='https://proxy.opinion.trade:8443',
                 apikey=api_key,
@@ -60,14 +68,13 @@ class OpinionTrader:
                 multi_sig_addr=multi_sig_addr,
                 conditional_tokens_addr='0xAD1a38cEc043e70E83a3eC30443dB285ED10D774',
                 multisend_addr='0x998739BFdAAdde7C933B942a68053933098f9EDa',
-                # Cache configuration for performance
-                cache_config={
-                    'markets_ttl': 60,  # Cache markets for 60 seconds
-                    'quote_tokens_ttl': 300,  # Cache quote tokens for 5 minutes
-                }
+                # Cache configuration per SDK docs (individual parameters, not dict)
+                market_cache_ttl=60,  # Cache markets for 60 seconds (high-frequency trading)
+                quote_tokens_cache_ttl=300,  # Cache quote tokens for 5 minutes
+                enable_trading_check_interval=3600  # Approval status cache (1 hour)
             )
             self.connected = True
-            print(json.dumps({"type": "info", "message": "Connected to Opinion Trade API"}))
+            print(json.dumps({"type": "info", "message": f"Connected to Opinion Trade API (wallet: {multi_sig_addr[:10]}...)"}), flush=True)
             return True
 
         except InvalidParamError as e:
@@ -83,20 +90,28 @@ class OpinionTrader:
     def get_markets(self) -> list:
         """Fetch only ACTIVE markets from Opinion Trade with proper error handling"""
         if not self.client:
-            return self._get_mock_markets()
+            print(json.dumps({"type": "error", "message": "Not connected to Opinion Trade API"}))
+            return []
 
         try:
             # Fetch only activated (live) markets per SDK docs
             response = self.client.get_markets(topic_status=TopicStatusFilter.ACTIVATED)
 
-            # Check errno for success (per SDK docs)
-            if isinstance(response, dict) and response.get('errno') != 0:
-                error_msg = response.get('message', 'Unknown error')
-                print(json.dumps({"type": "error", "message": f"API error: {error_msg}"}))
-                return self._get_mock_markets()
+            # Parse APIResponse format: {errno, errmsg, result: {data/list}}
+            if isinstance(response, dict):
+                errno = response.get('errno', 0)
+                if errno != 0:
+                    error_msg = response.get('errmsg') or response.get('message', 'Unknown error')
+                    print(json.dumps({"type": "error", "message": f"API error (errno {errno}): {error_msg}"}), flush=True)
+                    return []
 
-            # Handle different response formats
-            markets_data = response.get('data', response) if isinstance(response, dict) else response
+                # Extract from result.list or result.data per SDK docs
+                result = response.get('result', {})
+                markets_data = result.get('list') or result.get('data', [])
+            else:
+                # Fallback for direct list response
+                markets_data = response if isinstance(response, list) else []
+
             if not isinstance(markets_data, list):
                 markets_data = [markets_data] if markets_data else []
 
@@ -136,13 +151,13 @@ class OpinionTrader:
 
         except InvalidParamError as e:
             print(json.dumps({"type": "error", "message": f"Invalid parameter in get_markets: {str(e)}"}))
-            return self._get_mock_markets()
+            return []
         except OpenApiError as e:
             print(json.dumps({"type": "error", "message": f"API error in get_markets: {str(e)}"}))
-            return self._get_mock_markets()
+            return []
         except Exception as e:
             print(json.dumps({"type": "error", "message": f"Failed to get markets: {str(e)}"}))
-            return self._get_mock_markets()
+            return []
     
     def get_market_details(self, market_id: str) -> Optional[Dict[str, Any]]:
         """Fetch detailed market information including token IDs"""
@@ -156,20 +171,26 @@ class OpinionTrader:
         try:
             response = self.client.get_market(market_id)
 
-            # Check errno
-            if isinstance(response, dict) and response.get('errno') != 0:
-                error_msg = response.get('message', 'Unknown error')
-                print(json.dumps({"type": "error", "message": f"Failed to get market details: {error_msg}"}))
-                return None
+            # Parse APIResponse format: {errno, errmsg, result: {data}}
+            if isinstance(response, dict):
+                errno = response.get('errno', 0)
+                if errno != 0:
+                    error_msg = response.get('errmsg') or response.get('message', 'Unknown error')
+                    print(json.dumps({"type": "error", "message": f"Failed to get market details (errno {errno}): {error_msg}"}), flush=True)
+                    return None
 
-            market_data = response.get('data', response) if isinstance(response, dict) else response
+                # Extract from result.data per SDK docs
+                result = response.get('result', {})
+                market_data = result.get('data', response)
+            else:
+                market_data = response
 
             # Cache the result
             self.market_cache[market_id] = market_data
             return market_data
 
         except Exception as e:
-            print(json.dumps({"type": "error", "message": f"Failed to get market details: {str(e)}"}))
+            print(json.dumps({"type": "error", "message": f"Failed to get market details: {str(e)}"}), flush=True)
             return None
 
     def get_orderbook(self, token_id: str) -> Optional[Dict[str, Any]]:
@@ -180,23 +201,33 @@ class OpinionTrader:
         try:
             response = self.client.get_orderbook(token_id)
 
-            # Check errno
-            if isinstance(response, dict) and response.get('errno') != 0:
-                error_msg = response.get('message', 'Unknown error')
-                print(json.dumps({"type": "error", "message": f"Failed to get orderbook: {error_msg}"}))
-                return None
+            # Parse APIResponse format: {errno, errmsg, result: {data}}
+            if isinstance(response, dict):
+                errno = response.get('errno', 0)
+                if errno != 0:
+                    error_msg = response.get('errmsg') or response.get('message', 'Unknown error')
+                    print(json.dumps({"type": "error", "message": f"Failed to get orderbook (errno {errno}): {error_msg}"}), flush=True)
+                    return None
 
-            orderbook_data = response.get('data', response) if isinstance(response, dict) else response
+                # Extract from result.data per SDK docs
+                result = response.get('result', {})
+                orderbook_data = result.get('data', response)
+            else:
+                orderbook_data = response
+
             return orderbook_data
 
         except Exception as e:
-            print(json.dumps({"type": "error", "message": f"Failed to get orderbook: {str(e)}"}))
+            print(json.dumps({"type": "error", "message": f"Failed to get orderbook: {str(e)}"}), flush=True)
             return None
 
     def place_order(self, market_id: str, side: str, amount: float, price: float) -> dict:
         """Place an order on Opinion Trade with proper token ID and orderbook checking"""
         if not self.client:
-            return self._mock_place_order(market_id, side, amount, price)
+            return {
+                'success': False,
+                'error': 'Not connected to Opinion Trade API'
+            }
 
         try:
             # Get market details to fetch proper token IDs
@@ -242,18 +273,23 @@ class OpinionTrader:
                 makerAmountInQuoteToken=amount
             )
 
-            result = self.client.place_order(order_data)
+            response = self.client.place_order(order_data)
 
-            # Check errno
-            if isinstance(result, dict) and result.get('errno') != 0:
-                error_msg = result.get('message', 'Unknown error')
-                return {
-                    'success': False,
-                    'error': f"API error: {error_msg}"
-                }
+            # Parse APIResponse format: {errno, errmsg, result: {data}}
+            if isinstance(response, dict):
+                errno = response.get('errno', 0)
+                if errno != 0:
+                    error_msg = response.get('errmsg') or response.get('message', 'Unknown error')
+                    return {
+                        'success': False,
+                        'error': f"API error (errno {errno}): {error_msg}"
+                    }
 
-            # Extract result data
-            result_data = result.get('data', result) if isinstance(result, dict) else result
+                # Extract from result.data per SDK docs
+                result = response.get('result', {})
+                result_data = result.get('data', response)
+            else:
+                result_data = response
 
             return {
                 'success': True,
@@ -289,7 +325,8 @@ class OpinionTrader:
         Returns USD-equivalent if available, else raw balance fields.
         """
         if not self.client:
-            return self._mock_balance()
+            print(json.dumps({"type": "error", "message": "Not connected to Opinion Trade API"}))
+            return {"available": 0, "symbol": "UNKNOWN", "error": "Not connected"}
 
         try:
             # Try multiple potential balance methods from the SDK
@@ -303,23 +340,31 @@ class OpinionTrader:
                     break
 
             if not response:
-                print(json.dumps({"type": "warning", "message": "No balance method available, using mock"}))
-                return self._mock_balance()
+                print(json.dumps({"type": "error", "message": "No balance method available in SDK"}), flush=True)
+                return {"available": 0, "symbol": "UNKNOWN", "error": "Balance method not found"}
 
-            # Check errno if response is a dict
-            if isinstance(response, dict) and response.get('errno') is not None:
-                if response.get('errno') != 0:
-                    error_msg = response.get('message', 'Unknown error')
-                    print(json.dumps({"type": "error", "message": f"Balance API error: {error_msg}"}))
-                    return self._mock_balance()
-                # Extract data from response
-                response = response.get('data', response)
+            # Parse APIResponse format: {errno, errmsg, result: {data/list}}
+            if isinstance(response, dict):
+                errno = response.get('errno', 0)
+                if errno != 0:
+                    error_msg = response.get('errmsg') or response.get('message', 'Unknown error')
+                    print(json.dumps({"type": "error", "message": f"Balance API error (errno {errno}): {error_msg}"}), flush=True)
+                    return {"available": 0, "symbol": "UNKNOWN", "error": error_msg}
 
-            # Handle list of balances
-            if isinstance(response, list):
-                balances = response
+                # Extract from result.list or result.data per SDK docs
+                result = response.get('result', {})
+                balances_data = result.get('list') or result.get('data')
+
+                # Handle list of balances
+                if isinstance(balances_data, list):
+                    balances = balances_data
+                elif isinstance(balances_data, dict):
+                    balances = [balances_data]
+                else:
+                    balances = []
             else:
-                balances = [response]
+                # Fallback for direct list response
+                balances = response if isinstance(response, list) else [response]
 
             # Find USDC or USDT balance (quote tokens)
             quote_tokens = ['USDC', 'USDT', 'USD']
@@ -343,8 +388,8 @@ class OpinionTrader:
                     best = b
 
             if not best:
-                print(json.dumps({"type": "warning", "message": "No balances found, using mock"}))
-                return self._mock_balance()
+                print(json.dumps({"type": "error", "message": "No balances found in account"}))
+                return {"available": 0, "symbol": "UNKNOWN", "error": "No balances found"}
 
             return {
                 "available": float(best.get('available') or best.get('balance') or 0),
@@ -352,139 +397,30 @@ class OpinionTrader:
             }
 
         except InvalidParamError as e:
-            print(json.dumps({"type": "error", "message": f"Invalid parameter in get_balance: {str(e)}"}))
-            return self._mock_balance()
+            error_msg = f"Invalid parameter in get_balance: {str(e)}"
+            print(json.dumps({"type": "error", "message": error_msg}))
+            return {"available": 0, "symbol": "UNKNOWN", "error": error_msg}
         except OpenApiError as e:
-            print(json.dumps({"type": "error", "message": f"API error in get_balance: {str(e)}"}))
-            return self._mock_balance()
+            error_msg = f"API error in get_balance: {str(e)}"
+            print(json.dumps({"type": "error", "message": error_msg}))
+            return {"available": 0, "symbol": "UNKNOWN", "error": error_msg}
         except Exception as e:
-            print(json.dumps({"type": "error", "message": f"Failed to get balance: {str(e)}"}))
-            return self._mock_balance()
-    
-    def _get_mock_markets(self) -> list:
-        """Return mock markets for demo mode"""
-        return [
-            {
-                'id': '1',
-                'question': 'Will Bitcoin reach $100,000 by end of 2024?',
-                'category': 'Crypto',
-                'volume': 2500000,
-                'liquidity': 450000,
-                'status': 'active',
-                'endDate': '2024-12-31',
-                'outcomes': [
-                    {'id': '1a', 'name': 'Yes', 'probability': 0.42, 'change24h': 5.2},
-                    {'id': '1b', 'name': 'No', 'probability': 0.58, 'change24h': -5.2},
-                ],
-            },
-            {
-                'id': '2',
-                'question': 'Who will win the 2024 US Presidential Election?',
-                'category': 'Politics',
-                'volume': 15000000,
-                'liquidity': 2300000,
-                'status': 'active',
-                'endDate': '2024-11-05',
-                'outcomes': [
-                    {'id': '2a', 'name': 'Trump', 'probability': 0.52, 'change24h': 1.8},
-                    {'id': '2b', 'name': 'Biden', 'probability': 0.48, 'change24h': -1.8},
-                ],
-            },
-            {
-                'id': '3',
-                'question': 'Will the Fed cut rates in September 2024?',
-                'category': 'Finance',
-                'volume': 890000,
-                'liquidity': 120000,
-                'status': 'active',
-                'endDate': '2024-09-18',
-                'outcomes': [
-                    {'id': '3a', 'name': 'Yes', 'probability': 0.75, 'change24h': 3.1},
-                    {'id': '3b', 'name': 'No', 'probability': 0.25, 'change24h': -3.1},
-                ],
-            },
-            {
-                'id': '4',
-                'question': 'Will Ethereum ETF be approved in 2024?',
-                'category': 'Crypto',
-                'volume': 1200000,
-                'liquidity': 280000,
-                'status': 'active',
-                'endDate': '2024-12-31',
-                'outcomes': [
-                    {'id': '4a', 'name': 'Yes', 'probability': 0.68, 'change24h': 12.4},
-                    {'id': '4b', 'name': 'No', 'probability': 0.32, 'change24h': -12.4},
-                ],
-            },
-            {
-                'id': '5',
-                'question': 'Will Tesla stock close above $250 this week?',
-                'category': 'Finance',
-                'volume': 560000,
-                'liquidity': 85000,
-                'status': 'active',
-                'endDate': '2024-03-22',
-                'outcomes': [
-                    {'id': '5a', 'name': 'Yes', 'probability': 0.35, 'change24h': -8.2},
-                    {'id': '5b', 'name': 'No', 'probability': 0.65, 'change24h': 8.2},
-                ],
-            },
-            {
-                'id': '6',
-                'question': 'Will there be a TikTok ban in the US by 2025?',
-                'category': 'Politics',
-                'volume': 780000,
-                'liquidity': 95000,
-                'status': 'active',
-                'endDate': '2025-01-01',
-                'outcomes': [
-                    {'id': '6a', 'name': 'Yes', 'probability': 0.28, 'change24h': 2.1},
-                    {'id': '6b', 'name': 'No', 'probability': 0.72, 'change24h': -2.1},
-                ],
-            },
-        ]
-    
-    def _mock_place_order(self, market_id: str, side: str, amount: float, price: float) -> dict:
-        """Return mock order result for demo mode"""
-        import random
-        import hashlib
-        import time
-        
-        # Simulate some randomness in success
-        success = random.random() > 0.1  # 90% success rate
-        
-        if success:
-            # Generate a mock transaction hash
-            hash_input = f"{market_id}{side}{amount}{time.time()}"
-            tx_hash = '0x' + hashlib.sha256(hash_input.encode()).hexdigest()[:64]
-            
-            return {
-                'success': True,
-                'orderId': f"order-{int(time.time() * 1000)}",
-                'txHash': tx_hash,
-            }
-        else:
-            return {
-                'success': False,
-                'error': 'Mock order failed (simulated failure)',
-            }
-
-    def _mock_balance(self) -> dict:
-        """Return mock balance for demo mode"""
-        return {"available": 1000.0, "symbol": "USDC"}
+            error_msg = f"Failed to get balance: {str(e)}"
+            print(json.dumps({"type": "error", "message": error_msg}))
+            return {"available": 0, "symbol": "UNKNOWN", "error": error_msg}
 
 
 def main():
     """Main entry point - runs as a service accepting JSON commands via stdin"""
     trader = OpinionTrader()
-    
-    # Connect on startup
+
+    # Connect on startup - exit if connection fails
     if not trader.connect():
-        print(json.dumps({"type": "error", "message": "Failed to connect to Opinion Trade"}))
-    
-    # Signal ready
-    print(json.dumps({"type": "ready", "data": {"sdk_available": SDK_AVAILABLE}}))
-    sys.stdout.flush()
+        print(json.dumps({"type": "error", "message": "Failed to connect to Opinion Trade. Exiting."}), flush=True)
+        sys.exit(1)
+
+    # Signal ready only if connection succeeded
+    print(json.dumps({"type": "ready", "data": {"sdk_available": SDK_AVAILABLE}}), flush=True)
     
     # Process commands from stdin
     for line in sys.stdin:

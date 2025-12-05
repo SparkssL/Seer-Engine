@@ -200,11 +200,16 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 - Uses LIMIT orders via `PlaceOrderDataInput`
 - **Proper token ID fetching**: Calls `get_market()` to fetch actual token IDs from market details
 - **Orderbook checking**: Calls `get_orderbook()` before placing orders to check best bid/ask
-- **errno-based error handling**: Checks `errno` field in all API responses (0 = success)
+- **APIResponse parsing**: Correctly parses `{errno, errmsg, result: {data/list}}` format per SDK docs
+- **errno-based error handling**: Checks `errno` field (0 = success) with proper errmsg extraction
 - **Specific exception handling**: Catches `InvalidParamError` and `OpenApiError` separately
-- **Cache configuration**: Caches markets (60s TTL) and quote tokens (300s TTL) for performance
+- **Optimized cache configuration**:
+  - `market_cache_ttl=60` (high-frequency trading optimization)
+  - `quote_tokens_cache_ttl=300` (5 minutes)
+  - `enable_trading_check_interval=3600` (1 hour approval status cache)
 - **Robust balance fetching**: Tries multiple SDK methods, prefers USDC/USDT balances
-- Falls back to mock data/trades when SDK unavailable or credentials missing
+- **NO MOCK DATA**: All fallbacks removed - requires real API credentials and SDK installation
+- **Required credentials**: `OPINION_API_KEY`, `OPINION_PRIVATE_KEY`, `OPINION_MULTISIG_ADDR` (all mandatory)
 
 ## Configuration
 
@@ -213,11 +218,12 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 **Required**:
 - `OPENAI_API_KEY`: OpenAI API key for GPT-4 analysis
 
-**Optional** (demo mode if not set):
-- `TWITTER_API_KEY`: twitterapi.io API key for real-time tweets
-- `OPINION_API_KEY`: Opinion Trade API key
-- `OPINION_PRIVATE_KEY`: Wallet private key (hex format) for signing trades
-- `OPINION_RPC_URL`: BNB Chain RPC endpoint (default: `https://bsc-dataseed.binance.org`)
+**Required for Production**:
+- `TWITTER_API_KEY`: twitterapi.io API key for real-time tweets (no mock data fallback)
+- `OPINION_API_KEY`: Opinion Trade API key (required for market data) - obtain via Opinion Labs application
+- `OPINION_PRIVATE_KEY`: Wallet private key in hex format (64 characters, with or without 0x prefix) for signing trades
+- `OPINION_MULTISIG_ADDR`: Ethereum address that holds your assets/portfolio (REQUIRED - not optional)
+- `OPINION_RPC_URL`: BNB Chain RPC endpoint (optional, default: `https://bsc-dataseed.binance.org`)
 
 **Server Config**:
 - `BACKEND_PORT`: Backend server port (default: 3001)
@@ -225,17 +231,21 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 - `NEXT_PUBLIC_BACKEND_URL`: Backend URL visible to frontend (default: `http://localhost:3001`)
 - `DEMO_MODE`: Set to `true` to force demo mode even with API keys
 
-### Demo Mode Behavior
+### API Requirements (Updated 2025-12-06)
 
-When `DEMO_MODE=true` OR `TWITTER_API_KEY` is missing:
-- Backend generates mock tweets every 15 seconds
-- Python service uses mock markets and simulated trades
-- No actual API calls to Twitter or Opinion Trade
+**IMPORTANT**: Mock data has been completely removed. The system now requires real API credentials:
+
+- **Twitter API**: Required for tweet streaming. System will not function without `TWITTER_API_KEY`.
+- **Opinion Trade API**: Required for market data and trading. Python service will fail to start without proper credentials.
+- **Python Dependencies**: Must install `opinion-clob-sdk` via `pip install -r python-trader/requirements.txt`
+
+If credentials are missing or invalid, the system will return errors instead of mock data.
 
 ### Trading Parameters
 
 Configured in `backend/src/services/analyzer.ts`:
-- Minimum confidence threshold: `impactScore > 0.6`
+- Minimum impact threshold: `impactScore > 0.6`
+- **Minimum confidence threshold**: `confidence > 0.7` (Updated 2025-12-06)
 - Trade action filter: `action !== 'HOLD' && side !== null`
 - Balance guard: Fetches wallet balance once per session, caps trade sizes to available funds
 
@@ -243,6 +253,7 @@ Configured in `backend/src/services/openai.ts`:
 - Max markets to analyze: 5 (even if more are filtered)
 - Temperature: 0.2 (filtering), 0.3 (analysis)
 - Max tokens: 500 (filtering), 600 (analysis)
+- **AI generates confidence scores** (0.0-1.0) for each analysis (Updated 2025-12-06)
 
 ### Twitter Sources
 
@@ -285,11 +296,13 @@ The two-stage pipeline is cost-optimized:
 - Both stages use `response_format: { type: 'json_object' }` for structured output
 - Prompts include explicit rules for trade sizing and confidence thresholds
 
-### Session History
+### Session History (Updated 2025-12-06)
 
-AnalyzerService maintains last 50 sessions in memory:
-- Snapshots full session state (including steps, impacts, trades)
+AnalyzerService maintains last **500 sessions** in memory (increased from 50):
+- Snapshots full session state (including steps, impacts, trades, **confidence scores**)
 - Emitted to new clients on connection via `sessions:history`
+- Real-time analytics calculated and emitted via `sessions:analytics`
+- Includes filtering, search, and session replay capabilities
 - No database persistence (resets on server restart)
 
 ## Common Workflows

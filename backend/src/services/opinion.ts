@@ -30,7 +30,8 @@ export class OpinionService {
       
       console.log('[Opinion] Starting Python trader service...')
       
-      this.pythonProcess = spawn('python', [pythonPath], {
+      // Use python3 explicitly (required on macOS and modern Linux)
+      this.pythonProcess = spawn('python3', [pythonPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
@@ -95,9 +96,9 @@ export class OpinionService {
   private sendCommand(command: string, params: any): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.pythonProcess || !this.isConnected) {
-        // Return mock data if not connected
-        console.log('[Opinion] Service not connected, using mock data')
-        resolve(this.getMockResponse(command, params))
+        const error = new Error('Opinion service not connected. Ensure Python trader is running and Opinion API credentials are configured.')
+        console.error('[Opinion] Service not connected')
+        reject(error)
         return
       }
 
@@ -105,7 +106,7 @@ export class OpinionService {
       const message = JSON.stringify({ id, command, params }) + '\n'
 
       this.messageQueue.set(id, { resolve, reject })
-      
+
       this.pythonProcess.stdin?.write(message)
 
       // Timeout after 30 seconds
@@ -118,28 +119,13 @@ export class OpinionService {
     })
   }
 
-  private getMockResponse(command: string, params: any): any {
-    switch (command) {
-      case 'get_markets':
-        return this.getMockMarkets()
-      case 'place_order':
-        return {
-          success: true,
-          orderId: `order-${Date.now()}`,
-          txHash: `0x${Math.random().toString(16).substring(2)}...`,
-        }
-      default:
-        return null
-    }
-  }
-
   async getMarkets(): Promise<Market[]> {
     try {
       const response = await this.sendCommand('get_markets', {})
-      return response || this.getMockMarkets()
+      return response || []
     } catch (error) {
       console.error('[Opinion] Failed to get markets:', error)
-      return this.getMockMarkets()
+      return []
     }
   }
 
@@ -182,89 +168,6 @@ export class OpinionService {
         timestamp,
       }
     }
-  }
-
-  private getMockMarkets(): Market[] {
-    return [
-      {
-        id: '1',
-        question: 'Will Bitcoin reach $100,000 by end of 2024?',
-        category: 'Crypto',
-        volume: 2500000,
-        liquidity: 450000,
-        status: 'active',
-        endDate: '2024-12-31',
-        outcomes: [
-          { id: '1a', name: 'Yes', probability: 0.42, change24h: 5.2 },
-          { id: '1b', name: 'No', probability: 0.58, change24h: -5.2 },
-        ],
-      },
-      {
-        id: '2',
-        question: 'Who will win the 2024 US Presidential Election?',
-        category: 'Politics',
-        volume: 15000000,
-        liquidity: 2300000,
-        status: 'active',
-        endDate: '2024-11-05',
-        outcomes: [
-          { id: '2a', name: 'Trump', probability: 0.52, change24h: 1.8 },
-          { id: '2b', name: 'Biden', probability: 0.48, change24h: -1.8 },
-        ],
-      },
-      {
-        id: '3',
-        question: 'Will the Fed cut rates in September 2024?',
-        category: 'Finance',
-        volume: 890000,
-        liquidity: 120000,
-        status: 'active',
-        endDate: '2024-09-18',
-        outcomes: [
-          { id: '3a', name: 'Yes', probability: 0.75, change24h: 3.1 },
-          { id: '3b', name: 'No', probability: 0.25, change24h: -3.1 },
-        ],
-      },
-      {
-        id: '4',
-        question: 'Will Ethereum ETF be approved in 2024?',
-        category: 'Crypto',
-        volume: 1200000,
-        liquidity: 280000,
-        status: 'active',
-        endDate: '2024-12-31',
-        outcomes: [
-          { id: '4a', name: 'Yes', probability: 0.68, change24h: 12.4 },
-          { id: '4b', name: 'No', probability: 0.32, change24h: -12.4 },
-        ],
-      },
-      {
-        id: '5',
-        question: 'Will Tesla stock close above $250 this week?',
-        category: 'Finance',
-        volume: 560000,
-        liquidity: 85000,
-        status: 'active',
-        endDate: '2024-03-22',
-        outcomes: [
-          { id: '5a', name: 'Yes', probability: 0.35, change24h: -8.2 },
-          { id: '5b', name: 'No', probability: 0.65, change24h: 8.2 },
-        ],
-      },
-      {
-        id: '6',
-        question: 'Will there be a TikTok ban in the US by 2025?',
-        category: 'Politics',
-        volume: 780000,
-        liquidity: 95000,
-        status: 'active',
-        endDate: '2025-01-01',
-        outcomes: [
-          { id: '6a', name: 'Yes', probability: 0.28, change24h: 2.1 },
-          { id: '6b', name: 'No', probability: 0.72, change24h: -2.1 },
-        ],
-      },
-    ]
   }
 
   disconnect(): void {
