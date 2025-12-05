@@ -1,0 +1,25 @@
+{
+  "name": "seer-engine",
+  "version": "1.0.0",
+  "description": "AI-powered prediction market trading bot with real-time Twitter event analysis",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:trader\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:trader": "cd python-trader && python main.py",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../python-trader && pip install -r requirements.txt",
+    "build": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
