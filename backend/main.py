@@ -176,9 +176,9 @@ async def startup():
                 chain_id=settings.CHAIN_ID
             )
 
-            # Load markets
-            markets = opinion_service.get_markets()
-            print(f"[Analyzer] Loaded {len(markets)} markets", flush=True)
+            # Load markets at startup (cached for fast client connects)
+            markets = opinion_service.refresh_markets()
+            print(f"[Server] Loaded {len(markets)} markets into cache", flush=True)
         except Exception as e:
             print(f"[Opinion] Failed to initialize: {e}", flush=True)
             opinion_service = None

@@ -39,7 +39,17 @@ class OpinionService:
         except Exception as e:
             print(f"[Opinion] Connected but trading not enabled: {e}")
 
-    def get_markets(self, total_limit: int = 100) -> List[Market]:
+        # Cache for markets to avoid re-fetching on every client connect
+        self._cached_markets: List[Market] = []
+        self._markets_loaded = False
+
+    def get_markets(self, force_refresh: bool = False) -> List[Market]:
+        """Return cached markets (fast) or fetch if not loaded yet"""
+        if self._markets_loaded and not force_refresh:
+            return self._cached_markets
+        return self.refresh_markets()
+
+    def refresh_markets(self, total_limit: int = 100) -> List[Market]:
         """Fetch active markets from Opinion Trade - paginated to get more markets"""
         try:
             all_markets_data = []
@@ -80,13 +90,18 @@ class OpinionService:
                         tradeable_markets.append(market)
 
             print(f"[Opinion] Normalized {len(tradeable_markets)} tradeable markets")
+
+            # Update cache
+            self._cached_markets = tradeable_markets
+            self._markets_loaded = True
+
             return tradeable_markets
 
         except Exception as e:
             print(f"[Opinion] Failed to fetch markets: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return self._cached_markets  # Return stale cache on error
 
     def _is_activated(self, raw: any) -> bool:
         """Check if a market is activated (has token IDs)"""
