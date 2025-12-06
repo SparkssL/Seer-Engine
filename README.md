@@ -18,25 +18,25 @@ A BNB Chain hackathon project by the Midaz team. Seer Engine monitors real-time 
 
 ```mermaid
 flowchart LR
-  A[Visitor opens Seer Engine] --> B[Connect wallet]
-  B --> C[Select sources to monitor]
-  C --> D[Live tweets stream into Event Stream]
-  D --> E[AI pipeline enriches + scores impact]
-  E --> F[Relevant markets suggested]
-  F --> G[Auto-trade (or user confirms) on Opinion Trade]
-  G --> H[Execution + PnL surfaced in UI]
+  A["Visitor opens Seer Engine"] --> B["Connect wallet"]
+  B --> C["Select sources to monitor"]
+  C --> D["Live tweets stream into Event Stream"]
+  D --> E["AI pipeline enriches + scores impact"]
+  E --> F["Relevant markets suggested"]
+  F --> G["Auto-trade (or user confirms) on Opinion Trade"]
+  G --> H["Execution + PnL surfaced in UI"]
 ```
 
 ## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-  TW[twitter websocket] --> BE[Backend (FastAPI + Socket.IO)]
-  BE --> AI[OpenAI analysis + market selection]
-  AI --> OP[Opinion Trade CLOB SDK + Web3]
-  BE --> UI[Next.js frontend]
+  TW["Twitter websocket"] --> BE["Backend (FastAPI + Socket.IO)"]
+  BE --> AI["OpenAI analysis + market selection"]
+  AI --> OP["Opinion Trade CLOB SDK + Web3"]
+  BE --> UI["Next.js frontend"]
   OP --> BE
-  UI -->|Real-time| BE
+  UI -->|"Real-time"| BE
 ```
 
 ## 🚀 Quick Start
