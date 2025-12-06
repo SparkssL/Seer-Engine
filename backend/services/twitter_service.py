@@ -16,6 +16,9 @@ class TwitterService:
         self.max_reconnect_attempts = 5
         self.min_reconnect_delay = 90
 
+        # Selected accounts to monitor (lowercase for case-insensitive matching)
+        self.selected_accounts: List[str] = []
+
         # Event handlers
         self.on_tweet: Optional[Callable] = None
         self.on_connected: Optional[Callable] = None
@@ -25,7 +28,7 @@ class TwitterService:
     async def connect(self, sources: List[Source]) -> None:
         """Connect to Twitter WebSocket API"""
         if not self.api_key:
-            print("[Twitter] No API key, running in demo mode")
+            print("[Twitter] No API key; skipping connection")
             return
 
         # Flatten account lists from sources
@@ -37,6 +40,10 @@ class TwitterService:
         if not accounts:
             print("[Twitter] No accounts configured")
             return
+
+        # Store selected accounts (lowercase for case-insensitive matching)
+        self.selected_accounts = [acc.lower() for acc in accounts]
+        print(f"[Twitter] Filtering for accounts: {self.selected_accounts}")
 
         # Create WebSocket connection
         self.session = aiohttp.ClientSession()
@@ -95,6 +102,10 @@ class TwitterService:
 
                     tweet = self._parse_tweet(msg, msg)
                     if tweet:
+                        # Filter by selected accounts
+                        if not self._is_from_selected_account(tweet):
+                            print(f"[Twitter] Ignoring tweet from @{tweet.author.username} (not in selected accounts)", flush=True)
+                            return
                         print(f"[Twitter] New tweet from @{tweet.author.username}: {tweet.text[:50]}...", flush=True)
                         if self.on_tweet:
                             await self.on_tweet(tweet)
@@ -109,6 +120,10 @@ class TwitterService:
                     for tweet_data in tweets_data:
                         tweet = self._parse_tweet(tweet_data, msg)
                         if tweet:
+                            # Filter by selected accounts
+                            if not self._is_from_selected_account(tweet):
+                                print(f"[Twitter] Ignoring tweet from @{tweet.author.username} (not in selected accounts)", flush=True)
+                                continue
                             print(f"[Twitter] New tweet from @{tweet.author.username}: {tweet.text[:50]}...", flush=True)
                             if self.on_tweet:
                                 await self.on_tweet(tweet)
@@ -178,6 +193,13 @@ class TwitterService:
             traceback.print_exc()
             return None
 
+    def _is_from_selected_account(self, tweet: Tweet) -> bool:
+        """Check if tweet is from one of the selected accounts"""
+        if not self.selected_accounts:
+            # No filtering if no accounts selected (accept all)
+            return True
+        return tweet.author.username.lower() in self.selected_accounts
+
     async def disconnect(self) -> None:
         """Close WebSocket connection"""
         self.connected = False
@@ -203,48 +225,73 @@ class TwitterService:
         # Caller should handle reconnection
 
     def generate_mock_tweet(self) -> Tweet:
-        """Generate mock tweet for demo mode"""
-        templates = [
-            {
-                "text": "Federal Reserve announces 0.5% interest rate cut, citing improving inflation data",
-                "author": "Reuters",
-                "username": "Reuters",
-                "verified": True
-            },
-            {
-                "text": "Tesla reports Q4 deliveries beat expectations by 15%, stock surges in after-hours",
-                "author": "Bloomberg",
-                "username": "business",
-                "verified": True
-            },
-            {
-                "text": "Bitcoin trading volume hits $50B in 24 hours amid renewed institutional interest",
-                "author": "CoinDesk",
-                "username": "coindesk",
-                "verified": True
-            },
-            {
-                "text": "Senate passes $1.2T infrastructure bill with bipartisan support, construction stocks rally",
-                "author": "The Wall Street Journal",
-                "username": "WSJ",
-                "verified": True
-            },
-            {
-                "text": "Apple announces partnership with OpenAI to integrate AI features across iOS ecosystem",
-                "author": "TechCrunch",
-                "username": "TechCrunch",
-                "verified": True
-            }
+        """Generate mock tweet for testing from selected accounts"""
+        # Account-specific templates for realistic mock tweets
+        account_templates = {
+            "realdonaldtrump": [
+                {"text": "We are making America great again. The economy is booming like never before!", "name": "Donald J. Trump"},
+                {"text": "Tariffs on China are working. They are paying billions to our Treasury!", "name": "Donald J. Trump"},
+                {"text": "The stock market just hit another all-time high. Thank you!", "name": "Donald J. Trump"},
+            ],
+            "elonmusk": [
+                {"text": "Tesla FSD v13 is incredible. Robotaxis coming soon 🚗", "name": "Elon Musk"},
+                {"text": "Dogecoin to the moon 🚀", "name": "Elon Musk"},
+                {"text": "SpaceX Starship orbital flight test next week", "name": "Elon Musk"},
+                {"text": "X is now the everything app", "name": "Elon Musk"},
+            ],
+            "cz_binance": [
+                {"text": "4. BNB Chain ecosystem growing fast. More builders than ever.", "name": "CZ 🔶 BNB"},
+                {"text": "SAFU. Funds are safe.", "name": "CZ 🔶 BNB"},
+                {"text": "Education is key in crypto. DYOR always.", "name": "CZ 🔶 BNB"},
+            ],
+            "sbf_ftx": [
+                {"text": "Effective altruism is the future of philanthropy", "name": "SBF"},
+                {"text": "Crypto regulation needs to be balanced", "name": "SBF"},
+            ],
+            "0xtykoo": [
+                {"text": "New alpha dropping soon. Stay tuned 👀", "name": "Tykoo"},
+                {"text": "Bullish on prediction markets. The future of forecasting.", "name": "Tykoo"},
+            ],
+            "midaz_labs": [
+                {"text": "Seer Engine update: Now processing 10x more events per second", "name": "Midaz.xyz"},
+                {"text": "Building the future of autonomous trading on BNB Chain", "name": "Midaz.xyz"},
+            ],
+        }
+
+        # Fallback templates for any account
+        generic_templates = [
+            "This is going to be huge for crypto markets",
+            "Big news coming soon. Can't say more yet.",
+            "The market is looking bullish today",
+            "Interesting developments in the prediction market space",
         ]
 
-        template = random.choice(templates)
+        # Pick a random selected account, or use a fallback
+        if self.selected_accounts:
+            username = random.choice(self.selected_accounts)
+            username_lower = username.lower()
+
+            # Get account-specific templates or use generic
+            if username_lower in account_templates:
+                template = random.choice(account_templates[username_lower])
+                text = template["text"]
+                name = template["name"]
+            else:
+                text = random.choice(generic_templates)
+                name = username
+        else:
+            # Fallback to generic news if no accounts selected
+            username = "Reuters"
+            name = "Reuters"
+            text = "Breaking: Major market-moving event developing"
+
         return Tweet(
             id=f"mock-{datetime.now(timezone.utc).timestamp()}",
-            text=template["text"],
+            text=text,
             author=TweetAuthor(
-                name=template["author"],
-                username=template["username"],
-                verified=template["verified"]
+                name=name,
+                username=username,
+                verified=True
             ),
             timestamp=datetime.now(timezone.utc).isoformat(),
             metrics=TweetMetrics(

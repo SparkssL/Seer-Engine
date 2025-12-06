@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Settings, Play, Pause, Power, Activity, Shield, Wallet } from 'lucide-react'
+import { Settings, Play, Pause, Power, Activity, Shield, Wallet, ExternalLink } from 'lucide-react'
 import type { Source, Tweet, Market, AnalysisSession, SessionAnalytics, ConnectionStatus } from '@/lib/types'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -9,26 +9,33 @@ import { CentralLens } from './CentralLens'
 import { EventStream } from './EventStream'
 import { MarketImpactPanel } from '@/components/MarketImpactPanel'
 
-interface OracleConsoleProps {
+interface Balance {
+  available: number
+  symbol: string
+}
+
+interface SeerConsoleProps {
   sources: Source[]
   tweets: Tweet[]
   markets: Market[]
   activeSession: AnalysisSession | null
   sessions: AnalysisSession[]
   analytics: SessionAnalytics | null
+  balance: Balance | null
   status: ConnectionStatus
   onDisconnect: () => void
 }
 
-export function OracleConsole({
+export function SeerConsole({
   sources,
   markets,
   activeSession,
   sessions,
   analytics,
+  balance,
   status,
   onDisconnect
-}: OracleConsoleProps) {
+}: SeerConsoleProps) {
   const [isPaused, setIsPaused] = useState(false)
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
 
@@ -64,7 +71,9 @@ export function OracleConsole({
               <div className="flex items-center gap-2 text-cloud">
                  <Wallet className="w-3 h-3" />
                  <span>BALANCE:</span>
-                 <span className="text-sand">$1.09 USDT</span>
+                 <span className="text-sand">
+                    {balance ? `$${balance.available.toFixed(2)} ${balance.symbol}` : '—'}
+                 </span>
               </div>
            </div>
         </div>
@@ -152,12 +161,18 @@ export function OracleConsole({
                     </div>
                   ) : (
                     markets.map(market => (
-                       <div 
+                       <a
                           key={market.id}
-                          className="p-3 rounded border border-white/5 bg-black/20 hover:border-white/10 transition-colors cursor-pointer"
+                          href={`https://app.opinion.trade/detail?topicId=${market.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block p-3 rounded border border-white/5 bg-black/20 hover:border-accent/30 hover:bg-black/30 transition-colors group"
                        >
-                          <div className="text-xs text-sand font-medium leading-snug mb-2">
-                             {market.question}
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                             <div className="text-xs text-sand font-medium leading-snug flex-1">
+                                {market.question}
+                             </div>
+                             <ExternalLink className="w-3 h-3 text-cloud/30 group-hover:text-accent shrink-0 mt-0.5" />
                           </div>
                           <div className="flex items-center justify-between text-[10px] font-mono text-cloud">
                              <span>VOL: ${(market.volume / 1000).toFixed(1)}k</span>
@@ -167,7 +182,7 @@ export function OracleConsole({
                                 {market.status.toUpperCase()}
                              </span>
                           </div>
-                       </div>
+                       </a>
                     ))
                   )}
                </div>

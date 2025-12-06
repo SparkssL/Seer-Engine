@@ -6,6 +6,16 @@ import type { Source } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
+// Local avatar assets keyed by handle; fall back to remote if missing
+const AVATAR_ASSETS: Record<string, string> = {
+  realDonaldTrump: '/asset/trump.jpg',
+  elonmusk: '/asset/elonmusk.jpg',
+  cz_binance: '/asset/cz_bnb.jpg',
+  SBF_FTX: '/asset/sbf.jpg',
+  '0xTykoo': '/asset/0xtykoo.jpg',
+  Midaz_labs: '/asset/midaz.jpg'
+}
+
 // Define the specific targets as per user request
 const TARGETS = [
   { name: 'Donald J. Trump', handle: 'realDonaldTrump', avatar: 'https://pbs.twimg.com/profile_images/874276197357596672/kUuht00m_400x400.jpg', id: '1' },
@@ -51,7 +61,26 @@ export function SourceSelector({ onProceed }: SourceSelectorProps) {
         >
           <div className="inline-flex items-center gap-3 px-4 py-1.5 mb-6 border border-accent/30 rounded-full bg-accent/5 backdrop-blur-sm">
              <Sparkles className="w-3 h-3 text-accent" /> 
-             <span className="text-[10px] font-mono tracking-[0.2em] text-accent uppercase">Oracle Input Vectors</span>
+             <span className="text-[10px] font-mono tracking-[0.2em] text-accent uppercase">Seer Input Vectors</span>
+          </div>
+
+          <div className="flex items-center justify-center gap-4 mb-8">
+            {TARGETS.map(target => {
+              const avatarSrc = AVATAR_ASSETS[target.handle] ?? target.avatar
+              return (
+                <div 
+                  key={target.handle} 
+                  className="w-12 h-12 rounded-full overflow-hidden border border-white/10 bg-surface/60 backdrop-blur-sm"
+                >
+                  <img 
+                    src={avatarSrc} 
+                    alt={target.name} 
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              )
+            })}
           </div>
           
           <h2 className="font-display text-5xl md:text-7xl font-medium mb-8 text-sand tracking-tight leading-[0.9]">
@@ -68,6 +97,7 @@ export function SourceSelector({ onProceed }: SourceSelectorProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {TARGETS.map((target, index) => {
             const isSelected = selectedTargets.includes(target.handle)
+            const avatarSrc = AVATAR_ASSETS[target.handle] ?? target.avatar
             return (
               <motion.div
                 key={target.handle}
@@ -90,7 +120,7 @@ export function SourceSelector({ onProceed }: SourceSelectorProps) {
                   {/* Avatar Area */}
                   <div className="mb-6 relative">
                     <div className={cn(
-                      "w-16 h-16 rounded-full overflow-hidden border-2 transition-all duration-500",
+                      "w-16 h-16 rounded-full overflow-hidden border-2 transition-all duration-500 relative",
                       isSelected ? "border-accent shadow-[0_0_20px_rgba(212,175,55,0.3)]" : "border-white/10 group-hover:border-white/30"
                     )}>
                       {/* Fallback to icon if image fails load (in real app) */}
@@ -98,10 +128,11 @@ export function SourceSelector({ onProceed }: SourceSelectorProps) {
                          <User className="w-6 h-6 text-cloud" />
                          {/* Image overlay */}
                          <img 
-                           src={target.avatar} 
+                           src={avatarSrc} 
                            alt={target.name}
                            className="absolute inset-0 w-full h-full object-cover"
                            onError={(e) => e.currentTarget.style.display = 'none'}
+                           loading="lazy"
                          />
                       </div>
                     </div>

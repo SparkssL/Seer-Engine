@@ -9,29 +9,13 @@ if [[ ! -f "$ROOT/.env" ]]; then
   exit 1
 fi
 
-# Read DEMO_MODE (default false) and lowercase without bash-specific ${var,,}
-DEMO_MODE_VALUE="$(grep -E '^DEMO_MODE=' "$ROOT/.env" | tail -n1 | cut -d= -f2 || true)"
-DEMO_MODE_RAW="${DEMO_MODE_VALUE:-false}"
-DEMO_MODE="$(printf '%s' "$DEMO_MODE_RAW" | tr '[:upper:]' '[:lower:]')"
-
 echo "🔧 Ensuring dependencies..."
 if [[ ! -d "$ROOT/node_modules" ]]; then npm install; fi
 if [[ ! -d "$ROOT/frontend/node_modules" ]]; then (cd frontend && npm install); fi
-if [[ ! -d "$ROOT/backend/node_modules" ]]; then (cd backend && npm install); fi
+echo "🐍 Ensuring backend Python deps..."
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+(cd backend && "$PYTHON_BIN" -m pip install -r requirements.txt)
 
-if [[ "${DEMO_MODE}" == "true" ]]; then
-  echo "🛑 DEMO_MODE=true -> skipping python-trader deps"
-else
-echo "🐍 Ensuring python-trader deps..."
-PYTHON_BIN="${PYTHON_BIN:-/opt/homebrew/opt/python@3.10/bin/python3.10}"
-(cd python-trader && "$PYTHON_BIN" -m pip install -r requirements.txt)
-fi
-
-echo "🚀 Starting services (DEMO_MODE=${DEMO_MODE})..."
-if [[ "${DEMO_MODE}" == "true" ]]; then
-  # In demo we skip trader; backend uses mock Opinion
-  npx concurrently "npm run dev:backend" "npm run dev:frontend"
-else
-  PYTHON_BIN="$PYTHON_BIN" npm run dev
-fi
+echo "🚀 Starting services..."
+npx concurrently "npm run dev:backend" "npm run dev:frontend"
 

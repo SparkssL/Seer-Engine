@@ -39,39 +39,53 @@ class OpinionService:
         except Exception as e:
             print(f"[Opinion] Connected but trading not enabled: {e}")
 
-    def get_markets(self) -> List[Market]:
-        """Fetch active markets from Opinion Trade - Direct SDK call!"""
+    def get_markets(self, total_limit: int = 100) -> List[Market]:
+        """Fetch active markets from Opinion Trade - paginated to get more markets"""
         try:
-            # Fetch markets with ACTIVATED status filter to prioritize tradeable markets
-            response = self.client.get_markets(limit=20, status=TopicStatusFilter.ACTIVATED)
+            all_markets_data = []
+            page_size = 20  # SDK max per page
+            pages_needed = (total_limit + page_size - 1) // page_size  # Ceiling division
 
-            # Parse response based on SDK structure
-            markets_data = []
-            if hasattr(response, 'result'):
-                result = getattr(response, 'result', None)
-                if result and hasattr(result, 'list'):
-                    markets_data = getattr(result, 'list', [])
+            print(f"[Opinion] Fetching {total_limit} markets ({pages_needed} pages)...")
+
+            for page in range(1, pages_needed + 1):
+                response = self.client.get_markets(
+                    limit=page_size,
+                    page=page,
+                    status=TopicStatusFilter.ACTIVATED
+                )
+
+                # Parse response based on SDK structure
+                if hasattr(response, 'result'):
+                    result = getattr(response, 'result', None)
+                    if result and hasattr(result, 'list'):
+                        page_data = getattr(result, 'list', [])
+                        all_markets_data.extend(page_data)
+                        print(f"[Opinion] Page {page}: fetched {len(page_data)} markets")
+
+                        # Stop if we got fewer than page_size (no more pages)
+                        if len(page_data) < page_size:
+                            break
 
             # Count actually activated markets (with token IDs)
-            activated_count = sum(1 for m in markets_data if self._is_activated(m))
-            print(f"[Opinion] Fetched {len(markets_data)} markets from SDK ({activated_count} activated with token IDs)")
+            activated_count = sum(1 for m in all_markets_data if self._is_activated(m))
+            print(f"[Opinion] Total fetched: {len(all_markets_data)} markets ({activated_count} activated with token IDs)")
 
             # Only keep ACTIVATED markets with token IDs (tradeable)
-            # Filter out CREATED markets since they have no token IDs and can't be traded
             tradeable_markets = []
-            for raw_market in markets_data:
+            for raw_market in all_markets_data:
                 if self._is_activated(raw_market):
                     market = self._normalize_market(raw_market)
                     if market and market.yesTokenId and market.noTokenId:
                         tradeable_markets.append(market)
 
-            markets = tradeable_markets
-
-            print(f"[Opinion] Normalized {len(markets)} tradeable markets")
-            return markets
+            print(f"[Opinion] Normalized {len(tradeable_markets)} tradeable markets")
+            return tradeable_markets
 
         except Exception as e:
             print(f"[Opinion] Failed to fetch markets: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def _is_activated(self, raw: any) -> bool:

@@ -134,19 +134,28 @@ export function CentralLens({ session }: CentralLensProps) {
       <div className="max-w-3xl mx-auto space-y-8">
         
         {/* 1. The Source Event */}
-        <ThoughtBlock 
-          title="Ingestion" 
-          icon={Terminal} 
+        <ThoughtBlock
+          title="Ingestion"
+          icon={Terminal}
           status={hasTweet ? 'complete' : 'active'}
         >
           <div className="flex gap-4">
              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-lg font-bold text-sand">
                 {session.tweet.author.name[0]}
              </div>
-             <div>
+             <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                    <span className="text-sand font-bold">{session.tweet.author.name}</span>
                    <span className="text-cloud text-xs">@{session.tweet.author.username}</span>
+                   <a
+                      href={`https://x.com/${session.tweet.author.username}/status/${session.tweet.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent/60 hover:text-accent transition-colors"
+                      title="View original tweet"
+                   >
+                      <ExternalLink className="w-3 h-3" />
+                   </a>
                 </div>
                 <p className="text-sand/90 text-lg leading-snug">"{session.tweet.text}"</p>
              </div>
@@ -200,7 +209,7 @@ export function CentralLens({ session }: CentralLensProps) {
 
               {/* 3. The Oracle (Impact Analysis) */}
               <ThoughtBlock 
-                 title="Oracle Insight" 
+                 title="Seer Insight" 
                  icon={Brain}
                  status={hasImpact ? 'complete' : 'active'}
               >
@@ -209,10 +218,18 @@ export function CentralLens({ session }: CentralLensProps) {
                        {session.marketImpacts.map(impact => (
                           <div key={impact.marketId} className="bg-black/20 rounded-lg p-4 border border-white/5">
                              {/* Market Header */}
-                             <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-sand font-medium text-sm flex-1">{impact.market.question}</h4>
+                             <div className="flex items-center justify-between mb-3 gap-2">
+                                <a
+                                   href={`https://app.opinion.trade/detail?topicId=${impact.marketId}`}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="text-sand font-medium text-sm flex-1 hover:text-accent transition-colors flex items-center gap-1.5 group"
+                                >
+                                   {impact.market.question}
+                                   <ExternalLink className="w-3 h-3 text-cloud/30 group-hover:text-accent shrink-0" />
+                                </a>
                                 <span className={cn(
-                                   "px-2 py-0.5 rounded text-[10px] font-mono uppercase",
+                                   "px-2 py-0.5 rounded text-[10px] font-mono uppercase shrink-0",
                                    impact.sentiment === 'POSITIVE' ? "bg-green-500/20 text-green-400" :
                                    impact.sentiment === 'NEGATIVE' ? "bg-red-500/20 text-red-400" :
                                    "bg-gray-500/20 text-gray-400"

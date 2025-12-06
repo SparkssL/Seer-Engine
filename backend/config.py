@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     # OpenAI (Required)
     OPENAI_API_KEY: str
 
-    # Twitter (Optional - demo mode if missing)
-    TWITTER_API_KEY: Optional[str] = None
+    # Twitter (Required)
+    TWITTER_API_KEY: str
 
-    # Opinion Trade (Optional - mock mode if missing)
+    # Opinion Trade (optional: disables trading if missing)
     OPINION_API_KEY: Optional[str] = None
     OPINION_PRIVATE_KEY: Optional[str] = None
     OPINION_RPC_URL: str = "https://bsc-dataseed.binance.org"
@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     # Server Config
     BACKEND_PORT: int = 3001
     FRONTEND_URL: str = "http://localhost:3000"
-    DEMO_MODE: bool = False
 
     # Opinion SDK Config
     HOST: Optional[str] = "https://proxy.opinion.trade:8443"  # From .env

@@ -76,7 +76,7 @@ python main.py
 
 ### Quick Start Script
 ```bash
-# All-in-one startup (checks .env, installs deps, honors DEMO_MODE)
+# All-in-one startup (checks .env, installs deps)
 ./scripts/start-all.sh
 ```
 
@@ -118,14 +118,12 @@ The backend (`backend/src/`) orchestrates the entire analysis pipeline:
 **Entry Point**: `index.ts`
 - Initializes Express server and Socket.IO
 - Manages service lifecycle (Twitter, OpenAI, Opinion, Analyzer)
-- Handles demo mode (generates mock tweets when `DEMO_MODE=true` or no Twitter API key)
 - Graceful shutdown on SIGTERM/SIGINT
 
 **Core Services** (`backend/src/services/`):
 
 1. **TwitterService** (`twitter.ts`):
    - Connects to twitterapi.io WebSocket for real-time tweet streams
-   - Generates mock tweets in demo mode
    - Emits 'tweet', 'connected', 'disconnected', 'error' events
 
 2. **OpenAIService** (`openai.ts`):
@@ -250,7 +248,6 @@ The Python service (`python-trader/main.py`) is a stdin/stdout JSON RPC service:
 - `BACKEND_PORT`: Backend server port (default: 3001)
 - `FRONTEND_URL`: Frontend URL for CORS (default: `http://localhost:3000`)
 - `NEXT_PUBLIC_BACKEND_URL`: Backend URL visible to frontend (default: `http://localhost:3001`)
-- `DEMO_MODE`: Set to `true` to force demo mode even with API keys
 
 ### API Requirements (Updated 2025-12-06)
 
@@ -372,7 +369,6 @@ Check console logs prefixed by service:
 
 - **ESM Imports**: Always use `.js` extension in imports (TypeScript requirement with ESM)
 - **API Keys**: Never commit real API keys; use `.env` file (already in `.gitignore`)
-- **Demo Mode**: Perfect for testing without API costs or rate limits
 - **Balance Guard**: Python service fetches balance once per session to avoid overspending
 - **Queue System**: Analyzer processes one tweet at a time; subsequent tweets are queued
 - **Session History**: Limited to 50 sessions to avoid memory bloat

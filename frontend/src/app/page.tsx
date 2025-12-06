@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { Play, Hexagon } from 'lucide-react'
-import { OracleBackground } from '@/components/OracleBackground'
+import { SeerBackground } from '@/components/SeerBackground'
 import { motion, AnimatePresence } from 'framer-motion'
-import { OracleConsole } from '@/components/console/OracleConsole'
+import { SeerConsole } from '@/components/console/SeerConsole'
 import { SourceSelector } from '@/components/SourceSelector'
 import { useSocket } from '@/hooks/useSocket'
 import type { Source } from '@/lib/types'
@@ -66,7 +66,7 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen selection:bg-accent selection:text-canvas overflow-hidden">
-      <OracleBackground />
+      <SeerBackground />
       
       <AnimatePresence mode="wait">
         {view === 'dashboard' && (
@@ -77,7 +77,7 @@ export default function Home() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <OracleConsole sources={sources} onDisconnect={handleDisconnect} analytics={analytics} {...socketData} />
+            <SeerConsole sources={sources} onDisconnect={handleDisconnect} analytics={analytics} {...socketData} />
           </motion.div>
         )}
 
@@ -119,7 +119,7 @@ export default function Home() {
                     AI-POWERED PREDICTION MARKET TRADING
                   </p>
                   <h1 className="hero-title font-display text-transparent bg-clip-text bg-gradient-to-r from-sand via-white to-accent/50 text-5xl md:text-7xl mb-8">
-                    The Oracle of the Blockchain Age
+                    The Seer of the Blockchain Age
                   </h1>
                   <p className="hero-sub font-light text-cloud/80 text-lg md:text-xl leading-relaxed mb-12 max-w-2xl mx-auto">
                     Seer Engine fuses ancient divination with GPT-5 neural networks. 

@@ -6,6 +6,11 @@ import type { ConnectionStatus, Tweet, Market, AnalysisSession, Source, SessionA
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
+interface Balance {
+  available: number
+  symbol: string
+}
+
 interface UseSocketReturn {
   status: ConnectionStatus
   tweets: Tweet[]
@@ -13,6 +18,7 @@ interface UseSocketReturn {
   sessions: AnalysisSession[]
   activeSession: AnalysisSession | null
   analytics: SessionAnalytics | null
+  balance: Balance | null
   connect: (sources: Source[]) => void
   disconnect: () => void
 }
@@ -25,6 +31,7 @@ export function useSocket(): UseSocketReturn {
   const [sessions, setSessions] = useState<AnalysisSession[]>([])
   const [activeSession, setActiveSession] = useState<AnalysisSession | null>(null)
   const [analytics, setAnalytics] = useState<SessionAnalytics | null>(null)
+  const [balance, setBalance] = useState<Balance | null>(null)
 
   const connect = useCallback((sources: Source[]) => {
     if (socketRef.current?.connected) return
@@ -88,6 +95,11 @@ export function useSocket(): UseSocketReturn {
       setAnalytics(data)
     })
 
+    // Handle balance updates
+    socket.on('balance', (data: Balance) => {
+      setBalance(data)
+    })
+
     socketRef.current = socket
   }, [])
 
@@ -113,6 +125,7 @@ export function useSocket(): UseSocketReturn {
     sessions,
     activeSession,
     analytics,
+    balance,
     connect,
     disconnect,
   }

@@ -35,15 +35,11 @@ twitter_service: TwitterService = None
 openai_service: OpenAIService = None
 opinion_service: OpinionService = None
 analyzer_service: AnalyzerService = None
-demo_mode_task: asyncio.Task = None
 
 # Health endpoint
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok",
-        "demoMode": settings.DEMO_MODE or not settings.TWITTER_API_KEY
-    }
+    return {"status": "ok"}
 
 # Socket.IO event handlers
 @sio.event
@@ -56,8 +52,14 @@ async def connect(sid, environ):
             markets = opinion_service.get_markets()
             print(f"[Socket] Sending {len(markets)} markets to client {sid}", flush=True)
             await sio.emit('markets', [m.dict() for m in markets], to=sid)
+
+            # Send balance
+            balance = await opinion_service.get_balance()
+            print(f"[Socket] Sending balance to client {sid}: {balance}", flush=True)
+            await sio.emit('balance', balance, to=sid)
         else:
             print(f"[Socket] No opinion_service available", flush=True)
+            await sio.emit('balance', {"available": 0.0, "symbol": "USDC"}, to=sid)
 
         if analyzer_service:
             history = analyzer_service.sessions
@@ -71,32 +73,41 @@ async def connect(sid, environ):
 @sio.event
 async def configure(sid, data):
     """Configure Twitter sources"""
-    global demo_mode_task, twitter_service
+    global twitter_service
 
     sources = [Source(**s) for s in data.get('sources', [])]
 
-    # Check if demo mode
-    if settings.DEMO_MODE or not settings.TWITTER_API_KEY:
-        print("[Server] Starting demo mode...")
-        if not demo_mode_task or demo_mode_task.done():
-            demo_mode_task = asyncio.create_task(run_demo_mode())
-    else:
-        # Connect to Twitter
-        twitter_service.on_tweet = lambda tweet: asyncio.create_task(
-            on_tweet_received(tweet)
-        )
-        await twitter_service.connect(sources)
+    # Extract selected accounts from sources
+    selected_accounts = []
+    for source in sources:
+        if source.enabled and source.accounts:
+            selected_accounts.extend(source.accounts)
+
+    # Store selected accounts in twitter_service for filtering
+    if twitter_service:
+        twitter_service.selected_accounts = [acc.lower() for acc in selected_accounts]
+        print(f"[Server] Configured to monitor accounts: {twitter_service.selected_accounts}")
+
+    # Connect to Twitter (requires API key)
+    if not settings.TWITTER_API_KEY:
+        msg = "[Server] TWITTER_API_KEY missing; cannot start streaming."
+        print(msg, flush=True)
+        await sio.emit('error', {"message": msg}, to=sid)
+        return
+
+    twitter_service.on_tweet = lambda tweet: asyncio.create_task(
+        on_tweet_received(tweet)
+    )
+    await twitter_service.connect(sources)
 
 @sio.event
 async def disconnect(sid):
     print(f"[Socket] Client disconnected: {sid}")
 
-    # Stop demo mode if no more clients
+    # Disconnect Twitter when last client leaves
     try:
         clients = list(sio.manager.rooms.get('/', {}).keys())
         if len(clients) == 0:
-            if demo_mode_task and not demo_mode_task.done():
-                demo_mode_task.cancel()
             if twitter_service:
                 await twitter_service.disconnect()
     except Exception as e:
@@ -143,19 +154,6 @@ async def on_tweet_received(tweet):
     except Exception as e:
         print(f"[Server] Tweet handling error: {e}")
 
-async def run_demo_mode():
-    """Generate mock tweets every 15 seconds"""
-    try:
-        while True:
-            await asyncio.sleep(15)
-            if twitter_service:
-                mock_tweet = twitter_service.generate_mock_tweet()
-                await on_tweet_received(mock_tweet)
-    except asyncio.CancelledError:
-        print("[Server] Demo mode stopped")
-    except Exception as e:
-        print(f"[Server] Demo mode error: {e}")
-
 # Startup
 @app.on_event("startup")
 async def startup():
@@ -191,15 +189,12 @@ async def startup():
     analyzer_service = AnalyzerService(openai_service, opinion_service, sio)
 
     print(f"[Server] Ready on port {settings.BACKEND_PORT}", flush=True)
-    print(f"[Server] Demo mode: {settings.DEMO_MODE or not settings.TWITTER_API_KEY}", flush=True)
 
 # Shutdown
 @app.on_event("shutdown")
 async def shutdown():
     if twitter_service:
         await twitter_service.disconnect()
-    if demo_mode_task and not demo_mode_task.done():
-        demo_mode_task.cancel()
     print("[Server] Shutdown complete")
 
 # Run with: uvicorn main:socket_app --host 0.0.0.0 --port 3001 --reload

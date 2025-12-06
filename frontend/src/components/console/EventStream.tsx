@@ -38,7 +38,7 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
         <div className="flex items-center gap-2">
           <Terminal className="w-3 h-3 text-accent" />
           <h3 className="font-display text-xs text-sand tracking-widest uppercase">
-            Ingestion Stream
+            Event Stream
           </h3>
         </div>
         <span className="font-mono text-[10px] text-cloud">
@@ -86,14 +86,26 @@ export function EventStream({ sessions, selectedId, onSelect }: EventStreamProps
 
                 <div className="pl-2">
                   <div className="flex items-center justify-between mb-1">
-                     <span className="text-[10px] font-mono text-accent/80">
-                        @{session.tweet.author.username}
-                     </span>
+                     <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-accent/80">
+                           @{session.tweet.author.username}
+                        </span>
+                        <a
+                           href={`https://x.com/${session.tweet.author.username}/status/${session.tweet.id}`}
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           className="text-cloud/50 hover:text-accent transition-colors"
+                           title="View original tweet"
+                           onClick={(e) => e.stopPropagation()}
+                        >
+                           <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                     </div>
                      <span className="text-[9px] font-mono text-cloud">
                         {new Date(session.startTime).toLocaleTimeString()}
                      </span>
                   </div>
-                  
+
                   <div className="text-xs text-sand/90 font-medium leading-snug line-clamp-2 mb-2">
                      {session.tweet.text}
                   </div>

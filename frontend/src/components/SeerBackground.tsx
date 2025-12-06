@@ -68,7 +68,7 @@ function InnerSphere() {
   )
 }
 
-export function OracleBackground() {
+export function SeerBackground() {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none bg-canvas">
       <Canvas camera={{ position: [0, 0, 40], fov: 60 }}>
